@@ -76,7 +76,7 @@ impl<'v> Default for Util<'v>  {
 /// out-degree, or whether a vertex is ‘marked’. Utility fields might
 /// also link the vertex to other vertices or arcs in one or more
 /// lists.
-struct Vertex<'v>  {
+pub struct Vertex<'v>  {
     /// linked-list of arcs coming out of this vertex
     arcs: Cell<Option<&'v Arc<'v>>>,
     /// string identifying this vertex symbolically
@@ -136,7 +136,7 @@ struct Arc<'v>  {
     b: Util<'v>,
 }
 
-struct Area {
+pub struct Area {
     arena: arena::Arena
 }
 
@@ -174,7 +174,7 @@ impl Default for Area {
 ///     }
 /// }
 /// ```
-struct Graph<'v>  {
+pub struct Graph<'v>  {
     /// the vertex array
     vertices: &'v [Vertex<'v>],
     /// total number of vertices
