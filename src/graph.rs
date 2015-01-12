@@ -1,3 +1,5 @@
+use super::Long;
+
 use arena;
 
 use std::cell::Cell;
@@ -34,8 +36,6 @@ enum PanicCode {
     // "this can't happen"
     Impossible = 90,
 }
-
-type Long = i32;
 
 /// The suffixes .V , .A, .G, and .S on the name of a utility variable
 /// mean that the variable is a pointer to a vertex, arc, graph, or
@@ -433,6 +433,10 @@ impl<'v> Graph<'v>  {
 #[test]
 fn main_test() {
     // <create a small graph>
+    //
+    // (indeed, it is a *very* small graph.  And very little
+    //  functionality is provided by this module in terms of
+    //  traversing/manipulating graphs)
 
     let mut vertices = Graph::new_vertices(2);
     {
