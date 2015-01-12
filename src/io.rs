@@ -45,16 +45,18 @@ enum Error {
 #[test]
 fn main_test() {
     // <test the gb_open routine>
-    let mut c = Context::open(&Path::new("test.dat")).unwrap();
+    let mut c = Context::open(Path::new("test.dat")).unwrap();
 
     // <test the sample data lines>
     test_the_sample_data_lines(&mut c);
 
     // <test the gb_close routine>
+    c.close().unwrap()
 }
 
 struct Context {
     io_errors: Long,
+    filename: String,
     cur_file: BufferedReader<File>,
     cur_line: String,
     cur_line_offset: i8,
@@ -74,9 +76,10 @@ struct Context {
 }
 
 impl Context {
-    fn raw_open(f: File) -> Context {
+    fn raw_open(filename: String, f: File) -> Context {
         let mut c = Context {
             io_errors: 0,
+            filename: filename,
             cur_file: BufferedReader::new(f),
             cur_line: String::new(),
             cur_line_offset: 0,
@@ -165,9 +168,8 @@ static checksum_prime: Long = (1 << 30) - 83;
 /// "0123456789ABCDEF". This facilitates conversion of decimal and
 /// hexadecimal data. We can also use it for radices higher than 16.
 static imap: &'static str =
-    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvw\
-    xyz_^~&@,;.:?!%#$+−*/|\\<=>()[]{}‘’\" \n";
-
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+     abcdefghijklmnopqrstuvwxyz_^~&@,;.:?!%#$+-*/|\\<=>()[]{}`'\" \n";
 const unexpected_char: i8 = 127;
 
 pub fn imap_chr(d: Long) -> char {
@@ -216,8 +218,10 @@ impl Context {
         if self.more_data {
             self.fill_buf();
             if self.cur_line.char_at(0) != '*' {
-                self.magic =
-                    self.new_checksum(self.cur_line.as_slice(), self.magic);
+                let new_magic = self.new_checksum(self.cur_line.as_slice(),
+                                                  self.magic);
+                println!("magic old: {} new: {}", self.magic, new_magic);
+                self.magic = new_magic;
             }
         }
     }
@@ -226,7 +230,11 @@ impl Context {
     fn new_checksum(&self, s: &str, old_checksum: Long) -> Long {
         let mut a = old_checksum;
         for p in s.bytes() {
-            a = (a + a + self.imap_ord(p.to_i8().unwrap())) % checksum_prime;
+            let p2 = p.to_i8().unwrap();
+            let imap_ord = self.imap_ord(p2);
+            println!("checksum interm a: {} p: {} {} imap_ord: {}", a, p as char, p2, imap_ord);
+                     
+            a = (a + a + imap_ord) % checksum_prime;
         }
         a
     }
@@ -398,16 +406,19 @@ fn test_the_sample_data_lines(c: &mut Context) {
 }
 
 impl Context {
-    fn open(path: &Path) -> Result<Context, Error> {
-        File::open(path).map_err(|e| Error::CantOpenFile).and_then(|f| {
-            let mut c = Context::raw_open(f);
-            try!(c.check_first_line(path));
-            try!(c.check_second_line());
-            try!(c.check_third_line());
-            try!(c.check_fourth_line());
-            c.newline(); // the first line of real data is now in the buffer
-            Ok(c)
-        })
+    fn open(path: Path) -> Result<Context, Error> {
+        File::open(&path)
+            .map_err(|e| Error::CantOpenFile)
+            .and_then(|f| {
+                let filename = format!("{}", path.filename_display());
+                let mut c = Context::raw_open(filename, f);
+                try!(c.check_first_line());
+                try!(c.check_second_line());
+                try!(c.check_third_line());
+                try!(c.check_fourth_line());
+                c.newline(); // the first line of real data is now in the buffer
+                Ok(c)
+            })
     }
 }
 
@@ -434,8 +445,8 @@ impl Context {
 /// `$m$` are stored away as |tot_lines| and |final_magic|, to be
 /// matched at the end of the file.
 impl Context {
-    fn check_first_line(&mut self, p: &Path) -> Result<(), Error> {
-        let expect = format!("* File \"{}\"", p.filename_display());
+    fn check_first_line(&mut self) -> Result<(), Error> {
+        let expect = format!("* File \"{}\"", self.filename);
         if self.cur_line.slice_to(expect.len()) != expect {
             return Err(Error::BadFirstLine);
         }
@@ -485,7 +496,46 @@ impl Context {
     }
 }
 
-// TODO: Still have to write the analog of gb_close (which is
-// non-trivial because it is responsible for checking the overall line
-// count, that the final line is as expected, and that we have the
-// correct checksum.
+/// Closing a file. After all data has been input, or should have been
+/// input, we check that the file was open and that it had the correct
+/// number of lines, the correct magic number, and a correct final
+/// line. The subroutine gb close, like gb open, returns the value of
+/// io errors, which will be nonzero if at least one problem was
+/// noticed.
+impl Context {
+    fn close(mut self) -> Result<(), Error> {
+        self.fill_buf();
+        let expect = format!("* End of file \"{}\"",
+                             self.filename);
+        if self.cur_line.slice_to(expect.len()) != expect {
+            return Err(Error::BadLastLine)
+        }
+        self.more_data = false;
+        self.cur_line = String::new();
+        self.cur_line_offset = 0;
+        if self.line_no != self.tot_lines + 1 {
+            return Err(Error::WrongNumberOfLines);
+        }
+        if self.magic != self.final_magic {
+            debug!("magic: {} final_magic: {}", self.magic, self.final_magic);
+            return Err(Error::WrongChecksum);
+        }
+        Ok(())
+    }
+}
+
+/// There is also a less paranoid routine, gb raw close, that closes
+/// user-generated files. It simply closes the current file, if any,
+/// and returns the value of the magic checksum.
+///
+/// Example: The restore graph subroutine in GB SAVE uses gb raw open
+/// and gb raw close to provide system- independent input that is
+/// almost as foolproof as the reading of standard GraphBase data.
+impl Context {
+    fn raw_close(mut self) -> Long {
+        self.more_data = false;
+        self.cur_line = String::new();
+        self.cur_line_offset = 0;
+        return self.magic;
+    }
+}
