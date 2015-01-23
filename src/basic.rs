@@ -181,22 +181,26 @@ impl Context {
         let mut p: Long; // |piece|
         let mut l: Long; // length of current arc
 
+        let &mut Context {
+            ref area, ref working_storage,
+            ref mut nn, ref wr, ref del, ref sig, ref xx, ref yy } = self;
+
         // [Normalize the board size parameters 11]
         enum E { Periodic(usize), Done }
         if let E::Periodic(k) = {
             let k: usize;
             if piece == 0 { piece = 1; }
             if n1 <= 0 { n1 = 8; n2 = 8; n3 = 0; }
-            self.nn[1] = n1;
+            nn[1] = n1;
             let r = if n2 <= 0 {
                 k = 2; d = idx(-n2); n3 = 0; n4 = 0; E::Periodic(k)
             } else {
-                self.nn[2] = n2;
+                nn[2] = n2;
                 if n3 <= 0 { k = 3; d = idx(-n3); n4 = 0; E::Periodic(k) }
                 else {
-                    self.nn[3] = n3;
+                    nn[3] = n3;
                     if n4 <= 0 { k = 4; d = idx(-n4); E::Periodic(k) }
-                    else { k = 0; self.nn[4] = n4; d = 4; E::Done }
+                    else { k = 0; nn[4] = n4; d = 4; E::Done }
                 }
             };
             if d == 0 { assert!(k > 0); d = k - 1; E::Done } else { r } }
@@ -209,7 +213,7 @@ impl Context {
             // In unusual cases, the number of dimensions might not be
             // as large as the number of specifications.
             if idx(d) > MAX_D { panic!("bad_specs d: {}", d); }
-            for (j,k) in (k..idx(d+1)).enumerate() { self.nn[k] = self.nn[j+1] }
+            for (j,k) in (k..idx(d+1)).enumerate() { nn[k] = nn[j+1] }
         }
 
         // [Set up a graph with n vertices 13]
@@ -221,13 +225,13 @@ impl Context {
         const MAX_NNN: f32 = 1_000_000_000.0;
         let (mut n, mut nnn) = (1, 1.0);
         for j in 1..d+1 {
-            nnn *= self.nn[j] as f32;
+            nnn *= nn[j] as f32;
             if nnn > MAX_NNN {
                 panic!("very_bad_specs d: {} nn: {:?}",
-                       d, self.nn.slice(1, d+1));
+                       d, nn.slice(1, d+1));
             }
             // this multiplication cannot cause integer overflow
-            n *= self.nn[j];
+            n *= nn[j];
         }
         new_graph = unimplemented!();
         new_graph.id = format!("board({},{},{},{},{},{},{})",
@@ -236,6 +240,25 @@ impl Context {
         new_graph.util_types = [Z,Z,Z,I,I,I,Z,Z,Z,Z,Z,Z,Z,Z];
 
         // [Give names to the vertices 14]
+
+        // @ The symbolic name of a board position like $(3,1)$ will
+        // be the string `\.{3.1}'. The first three coordinates are
+        // also stored as integers, in utility fields |x.I|, |y.I|,
+        // and |z.I|, because immediate access to those values will be
+        // helpful in certain applications. (The coordinates can, of
+        // course, always be recovered in a slower fashion from the
+        // vertex name, via |sscanf|.)
+
+        // The process of assigning coordinate values and names is
+        // equivalent to adding unity in a mixed-radix number
+        // system. Vertex $(x_1,\ldots,x_d)$ will be in position
+        // $x_1n_2\ldots n_d+\cdots+x_{d-1}n_d+x_d$ relative to the
+        // first vertex of the new graph; therefore it is also
+        // possible to deduce the coordinates of a vertex from its
+        // address.
+
+        nn[0] = 0; self.xx[0] = 0; self.xx[1] = 0; self.xx[2] = 0; self.xx[3] = 0;
+
         unimplemented!();
 
         // [Insert arcs or edges for all legal moves 15]
