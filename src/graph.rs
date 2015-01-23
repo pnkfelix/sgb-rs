@@ -1,11 +1,11 @@
-use super::Long;
+use self::UtilType::{I,Z};
+use ::{Long, idx, long};
 
 use arena;
 
 use std::cell::Cell;
 use std::default::Default;
 use std::mem;
-use std::num::ToPrimitive;
 
 struct Context {
     /// nonzero if "verbose" output is desired
@@ -42,7 +42,7 @@ enum PanicCode {
 /// string, respectively; the suffix .I means that the variable is an
 /// integer. (We use one-character names because such names are easy
 /// to type when debugging.)
-enum Util<'v>  {
+pub enum Util<'v>  {
     V(&'v Vertex<'v>),
     A(&'v Arc<'v>),
     G(&'v Graph<'v>),
@@ -80,19 +80,19 @@ pub struct Vertex<'v>  {
     /// linked-list of arcs coming out of this vertex
     arcs: Cell<Option<&'v Arc<'v>>>,
     /// string identifying this vertex symbolically
-    name: String,
+    pub name: String,
     /// multipurpose field
-    u: Util<'v>,
+    pub u: Util<'v>,
     /// multipurpose field
-    v: Util<'v>,
+    pub v: Util<'v>,
     /// multipurpose field
-    w: Util<'v>,
+    pub w: Util<'v>,
     /// multipurpose field
-    x: Util<'v>,
+    pub x: Util<'v>,
     /// multipurpose field
-    y: Util<'v>,
+    pub y: Util<'v>,
     /// multipurpose field
-    z: Util<'v>,
+    pub z: Util<'v>,
 }
 
 impl<'v> Default for Vertex<'v>  {
@@ -140,10 +140,30 @@ pub struct Area {
     arena: arena::Arena
 }
 
+impl Area {
+    pub fn alloc<T, F>(&self, op: F) -> &mut T where F: FnOnce() -> T {
+        self.arena.alloc(op)
+    }
+}
+
 impl Default for Area {
     fn default() -> Area {
         Area { arena: arena::Arena::new() }
     }
+}
+
+/// either I (denoting a long integer), S (denoting a pointer to a
+/// string), V (denoting a pointer to a Vertex), A (denoting a
+/// pointer to an Arc), G (denoting a pointer to a Graph), or Z
+/// (denoting an unused field that remains zero)
+#[repr(i8)]
+pub enum UtilType {
+    I = 'I' as i8,
+    S = 'S' as i8,
+    V = 'V' as i8,
+    A = 'A' as i8,
+    G = 'G' as i8,
+    Z = 'Z' as i8,
 }
 
 /// Now we’re ready to look at the Graph type. This is a data
@@ -176,13 +196,13 @@ impl Default for Area {
 /// ```
 pub struct Graph<'v>  {
     /// the vertex array
-    vertices: &'v [Vertex<'v>],
+    pub vertices: &'v [Vertex<'v>],
     /// total number of vertices
     n: Long,
     /// total number of arcs
     m: Long,
     /// GraphBase identification
-    id: String,
+    pub id: String,
     /// usage of utility fields
     ///
     /// The util types field should always hold a string of length 14,
@@ -216,7 +236,7 @@ pub struct Graph<'v>  {
     /// software that might rely on the conventions of util types
     /// . (Such software is not part of the “official” Stanford
     /// GraphBase, but it might conceivably exist some day.)
-    util_types: [u8; 14],
+    pub util_types: [UtilType; 14],
     /// the main data blocks
     data: &'v Area,
     /// subsidiary data blocks
@@ -248,7 +268,7 @@ impl<'v> Graph<'v>  {
     /// 1 .
     fn mark_bipartitle(&mut self, n1: Long) {
         self.uu = Util::I(n1);
-        self.util_types[8] = 'I' as u8;
+        self.util_types[8] = I
     }
 
     /// A new graph is created by calling gb new graph(n), which
@@ -261,8 +281,8 @@ impl<'v> Graph<'v>  {
     /// claiming only n, because several graph manipulation algorithms
     /// like to add a special vertex or two to the graphs they deal
     /// with.
-    fn new_vertices(n: Long) -> Vec<Vertex<'v>> {
-        let mut vertices = Vec::with_capacity((n + EXTRA_N).to_uint().unwrap());
+    pub fn new_vertices(n: Long) -> Vec<Vertex<'v>> {
+        let mut vertices = Vec::with_capacity(idx(n + EXTRA_N));
         for _ in (0..n+EXTRA_N) {
             let v : Vertex = Default::default();
             vertices.push(v);
@@ -270,17 +290,17 @@ impl<'v> Graph<'v>  {
         vertices
     }
 
-    fn new_graph(vertices: &'v [Vertex<'v>], data: &'v Area) -> Graph<'v> {
-        let n = vertices.len().to_i32().unwrap() - EXTRA_N;
+    pub fn new_graph(vertices: &'v [Vertex<'v>], data: &'v Area) -> Graph<'v> {
+        let n = long(vertices.len()) - EXTRA_N;
         Graph {
             vertices: vertices,
             n: n,
             m: 0,
             id: format!("gb_new_graph({})", n),
-            util_types: ['Z' as u8, 'Z' as u8, 'Z' as u8, 'Z' as u8,
-                         'Z' as u8, 'Z' as u8, 'Z' as u8, 'Z' as u8,
-                         'Z' as u8, 'Z' as u8, 'Z' as u8, 'Z' as u8,
-                         'Z' as u8, 'Z' as u8,],
+            util_types: [Z, Z, Z, Z,
+                         Z, Z, Z, Z,
+                         Z, Z, Z, Z,
+                         Z, Z,],
             data: data,
             aux_data: Default::default(),
             uu: Default::default(),
@@ -296,7 +316,7 @@ impl<'v> Graph<'v>  {
     /// field of another graph. The following routines do this without
     /// allowing the string to get too long after repeated copying.
     fn make_compound_id(&mut self, s1: &str, gg: &Graph, s2: &str) {
-        let avail = (ID_FIELD_SIZE - s1.len().to_i32().unwrap() - s2.len().to_i32().unwrap()).to_uint().unwrap();
+        let avail = idx(ID_FIELD_SIZE - long(s1.len()) - long(s2.len()));
         if gg.id.len() < avail {
             self.id = format!("{}{}{}", s1, gg.id, s2);
         } else {
@@ -310,7 +330,7 @@ impl<'v> Graph<'v>  {
     fn make_double_compound_id(&mut self, s1: &str,
                                gg: &Graph, s2: &str,
                                ggg: &Graph, s3: &str) {
-        let avail = (ID_FIELD_SIZE - s1.len().to_i32().unwrap() - s2.len().to_i32().unwrap() - s3.len().to_i32().unwrap()).to_uint().unwrap();
+        let avail = idx(ID_FIELD_SIZE - long(s1.len()) - long(s2.len()) - long(s3.len()));
         if gg.id.len() + ggg.id.len() < avail {
             self.id = format!("{}{}{}{}{}", s1, gg.id, s2, ggg.id, s3);
         } else {
@@ -327,7 +347,7 @@ impl<'v> Graph<'v>  {
     /// |gb_new_graph|---the graph pointed to by the private variable
     /// |cur_graph|. This routine assumes that |u| and |v| are both
     /// vertices in |cur_graph|.
-    /// 
+    ///
     /// The new arc will be pointed to by |u->arcs|, immediately after
     /// |gb_new_arc(u,v,len)| has acted. If there is no room for the
     /// new arc, |gb_trouble_code| is set nonzero, but |u->arcs| will
