@@ -202,7 +202,7 @@ pub enum UtilType {
 ///     }
 /// }
 /// ```
-pub struct Graph<'v>  {
+pub struct Graph<'v, Util:Default=UtilFields<'v>>  {
     /// the vertex array
     vertices: &'v [Vertex<'v>],
     /// total number of vertices
@@ -249,18 +249,8 @@ pub struct Graph<'v>  {
     pub data: &'v Area,
     /// subsidiary data blocks
     pub aux_data: Area,
-    /// multipurpose field
-    pub uu: Util<'v>,
-    /// multipurpose field
-    pub vv: Util<'v>,
-    /// multipurpose field
-    pub ww: Util<'v>,
-    /// multipurpose field
-    pub xx: Util<'v>,
-    /// multipurpose field
-    pub yy: Util<'v>,
-    /// multipurpose field
-    pub zz: Util<'v>,
+    /// utility fields
+    pub util: Util,
 }
 
 pub const ID_FIELD_SIZE: Long = 161;
@@ -275,7 +265,7 @@ impl<'v> Graph<'v>  {
     /// of that first part. The size of the other part is then g⃗n − g⃗n
     /// 1 .
     pub fn mark_bipartitle(&mut self, n1: Long) {
-        self.uu = Util::I(n1);
+        self.util.u = Util::I(n1);
         self.util_types[8] = I
     }
 
@@ -311,12 +301,7 @@ impl<'v> Graph<'v>  {
                          Z, Z,],
             data: data,
             aux_data: Default::default(),
-            uu: Default::default(),
-            vv: Default::default(),
-            ww: Default::default(),
-            xx: Default::default(),
-            yy: Default::default(),
-            zz: Default::default(),
+            util: Default::default(),
         }
     }
 
