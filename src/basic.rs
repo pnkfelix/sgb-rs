@@ -11,6 +11,7 @@ use graph::UtilType::{Z,I};
 
 use std::default::Default;
 use std::fmt;
+use std::num::Int;
 
 /// We limit the number of dimensions to 91 or less. This is hardly a
 /// limitation, since the number of vertices would be astronomical
@@ -92,8 +93,8 @@ impl Classic for Context {
 }
 
 #[derive(Clone,Show)]
-struct Repeating(usize);
-impl Repeating { fn len(&self) -> usize { self.0 } }
+struct Repeating<I:Int>(I);
+impl<I:Int> Repeating<I> { fn len(&self) -> I { self.0 } }
 
 pub trait BoardDescription {
     type Dims: BoardDimensions + fmt::Show;
@@ -185,9 +186,9 @@ enum DynamicBoardDimensions {
     Once2((Long,Long)),
     Once3((Long,Long,Long)),
     Once4((Long,Long,Long,Long)),
-    Loop1((Repeating,Long,)),
-    Loop2((Repeating,Long,Long,)),
-    Loop3((Repeating,Long,Long,Long,)),
+    Loop1((Repeating<usize>,Long,)),
+    Loop2((Repeating<usize>,Long,Long,)),
+    Loop3((Repeating<usize>,Long,Long,Long,)),
 }
 
 impl BoardDimensions for (Long,) {
@@ -230,7 +231,7 @@ impl BoardDimensions for (Long,Long,Long,Long) {
     }
 }
 
-impl BoardDimensions for (Repeating,Long) {
+impl BoardDimensions for (Repeating<usize>,Long) {
     fn num_dims(&self) -> usize { self.0.len() }
     fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         let n = [self.1];
@@ -243,7 +244,7 @@ impl BoardDimensions for (Repeating,Long) {
     }
 }
 
-impl BoardDimensions for (Repeating,Long,Long) {
+impl BoardDimensions for (Repeating<usize>,Long,Long) {
     fn num_dims(&self) -> usize { self.0.len() }
     fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         let n = [self.1, self.2];
@@ -256,7 +257,7 @@ impl BoardDimensions for (Repeating,Long,Long) {
     }
 }
 
-impl BoardDimensions for (Repeating,Long,Long,Long) {
+impl BoardDimensions for (Repeating<usize>,Long,Long,Long) {
     fn num_dims(&self) -> usize { self.0.len() }
     fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         let n = [self.1, self.2, self.3];
