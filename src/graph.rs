@@ -202,9 +202,10 @@ pub enum UtilType {
 ///     }
 /// }
 /// ```
-pub struct Graph<'v, Util:Default=UtilFields<'v>>  {
+pub struct Graph<'v, Util=UtilFields<'v>, VertexUtil=UtilFields<'v>> where
+    Util:Default, VertexUtil:Default+'v {
     /// the vertex array
-    vertices: &'v [Vertex<'v>],
+    vertices: &'v [Vertex<'v, VertexUtil>],
     /// total number of vertices
     pub n: Long,
     /// total number of arcs
