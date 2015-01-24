@@ -86,117 +86,196 @@ trait Classic {
 impl Classic for Context {
     fn board(&mut self, n1: Long, n2: Long, n3: Long, n4: Long,
              piece: Long, wrap: Long, directed: Long) -> Graph {
-        Context::board(self, n1, n2, n3, n4, piece, wrap, directed)
+        Context::board(self, (n1, n2, n3, n4, piece, wrap, directed))
     }
 }
 
 struct Repeating(usize);
 impl Repeating { fn len(&self) -> usize { self.0 } }
 
+pub trait BoardDescription {
+    type Dims: BoardDimensions;
+    fn id(&self) -> String;
+    fn piece(&self) -> Long;
+    fn wrap(&self) -> Long;
+    fn directed(&self) -> bool;
+    fn dims(&self) -> Self::Dims;
+}
+
+// n1: n2: n3: n4: piece: wrap: directed
+impl BoardDescription for (Long, Long, Long, Long, Long, Long, Long) {
+    type Dims = DynamicBoardDimensions;
+    fn id(&self) -> String {
+        let (n1, n2, n3, n4, piece, wrap, directed) = *self;
+        format!("board({},{},{},{},{},{},{})",
+                n1, n2, n3, n4, piece, wrap, if directed != 0 { 1 } else { 0 })
+    }
+    fn piece(&self) -> Long { self.4 }
+    fn wrap(&self) -> Long { self.5 }
+    fn directed(&self) -> bool { self.6 != 0 }
+    fn dims(&self) -> DynamicBoardDimensions {
+        decode_the_board_size_parameters(self.0, self.1, self.2, self.3)
+    }
+}
+
+// n1: n2: n3: n4: piece: wrap: directed
+impl BoardDescription for (Long, Long, Long, Long, Long, Long, bool) {
+    type Dims = DynamicBoardDimensions;
+    fn id(&self) -> String {
+        let (n1, n2, n3, n4, piece, wrap, directed) = *self;
+        format!("board({},{},{},{},{},{},{})",
+                n1, n2, n3, n4, piece, wrap, if directed { 1 } else { 0 })
+    }
+    fn piece(&self) -> Long { self.4 }
+    fn wrap(&self) -> Long { self.5 }
+    fn directed(&self) -> bool { self.6 }
+    fn dims(&self) -> DynamicBoardDimensions {
+        decode_the_board_size_parameters(self.0, self.1, self.2, self.3)
+    }
+}
+
 pub trait BoardDimensions {
     fn num_dims(&self) -> usize;
     // calls `f` once for each dimension, passing the dimension's size
     // as well as its (zero-based) index in whole dimensional space.
-    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize);
+    fn fill_dims<F>(&self, f: F) where F: FnMut(Long, usize);
+}
+
+enum DynamicBoardDimensions {
+    Once1((Long,)),
+    Once2((Long,Long)),
+    Once3((Long,Long,Long)),
+    Once4((Long,Long,Long,Long)),
+    Loop1((Repeating,Long,)),
+    Loop2((Repeating,Long,Long,)),
+    Loop3((Repeating,Long,Long,Long,)),
 }
 
 impl BoardDimensions for (Long,) {
     fn num_dims(&self) -> usize { 1 }
-    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+    fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         f(self.0, 0);
     }
 }
 
 impl BoardDimensions for (Long,Long) {
     fn num_dims(&self) -> usize { 2 }
-    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+    fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         f(self.0, 0); f(self.1, 1);
     }
 }
 
 impl BoardDimensions for (Long,Long,Long) {
     fn num_dims(&self) -> usize { 3 }
-    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+    fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         f(self.0, 0); f(self.1, 1); f(self.2, 2);
     }
 }
 
 impl BoardDimensions for (Long,Long,Long,Long) {
     fn num_dims(&self) -> usize { 4 }
-    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+    fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         f(self.0, 0); f(self.1, 1); f(self.2, 2); f(self.3, 4);
     }
 }
 
 impl BoardDimensions for (Repeating,Long) {
-    fn num_dims(&self) -> usize { 1 }
-    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+    fn num_dims(&self) -> usize { self.0.len() }
+    fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         let n = [self.1];
         for k in 0..self.0.len() {
-            f(n[k % self.0.len()], k);
+            f(n[k % 1], k);
         }
     }
 }
 
 impl BoardDimensions for (Repeating,Long,Long) {
-    fn num_dims(&self) -> usize { 1 }
-    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+    fn num_dims(&self) -> usize { self.0.len() }
+    fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         let n = [self.1, self.2];
         for k in 0..self.0.len() {
-            f(n[k % self.0.len()], k);
+            f(n[k % 2], k);
         }
     }
 }
 
 impl BoardDimensions for (Repeating,Long,Long,Long) {
-    fn num_dims(&self) -> usize { 1 }
-    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+    fn num_dims(&self) -> usize { self.0.len() }
+    fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         let n = [self.1, self.2, self.3];
         for k in 0..self.0.len() {
-            f(n[k % self.0.len()], k);
+            f(n[k % 3], k);
         }
     }
 }
 
+impl BoardDimensions for DynamicBoardDimensions {
+    fn num_dims(&self) -> usize {
+        use self::DynamicBoardDimensions::*;
+        match *self {
+            Once1(ref t) => t.num_dims(),
+            Once2(ref t) => t.num_dims(),
+            Once3(ref t) => t.num_dims(),
+            Once4(ref t) => t.num_dims(),
+            Loop1(ref t) => t.num_dims(),
+            Loop2(ref t) => t.num_dims(),
+            Loop3(ref t) => t.num_dims(),
+        }
+    }
+
+    fn fill_dims<F>(&self, f: F) where F: FnMut(Long, usize) {
+        use self::DynamicBoardDimensions::*;
+        match *self {
+            Once1(ref t) => t.fill_dims(f),
+            Once2(ref t) => t.fill_dims(f),
+            Once3(ref t) => t.fill_dims(f),
+            Once4(ref t) => t.fill_dims(f),
+            Loop1(ref t) => t.fill_dims(f),
+            Loop2(ref t) => t.fill_dims(f),
+            Loop3(ref t) => t.fill_dims(f),
+        }
+    }
+}
+
+fn decode_the_board_size_parameters(
+    n1: Long, n2: Long, n3: Long, n4: Long) -> DynamicBoardDimensions {
+    use self::DynamicBoardDimensions::*;
+    if n1 <= 0 {
+        Once2((8, 8))
+    } else if n2 < 0 {
+        Loop1((Repeating(idx(-n2)), n1))
+    } else if n2 == 0 {
+        Once1((n1,))
+    } else if n3 < 0 {
+        Loop2((Repeating(idx(-n3)), n1, n2))
+    } else if n3 == 0 {
+        Once2((n1, n2))
+    } else if n4 < 0 {
+        Loop3((Repeating(idx(-n4)), n1, n2, n3))
+    } else if n4 == 0 {
+        Once3((n1, n2, n3))
+    } else {
+        Once4((n1, n2, n3, n4))
+    }
+}
+
 impl Context {
-    fn normalize_the_board_size_parameters(
-        &mut self, mut n1: Long, mut n2: Long, mut n3: Long, mut n4: Long,
-        mut piece: Long) -> (Long, Long, Long, Long, Long, usize) {
-        let mut d: usize;
-        let &mut Context { ref mut nn, .. } = self;
+
+    fn normalize_the_board_size_parameters<BD:BoardDimensions>(
+        &mut self, bd: BD, piece: Long) -> (Long, usize) {
 
         // [Normalize the board size parameters 11]
-        enum E { Periodic(usize), Done }
-        if let E::Periodic(k) = {
-            let k: usize;
-            if piece == 0 { piece = 1; }
-            if n1 <= 0 { n1 = 8; n2 = 8; n3 = 0; }
-            nn[1] = n1;
-            let r = if n2 <= 0 {
-                k = 2; d = idx(-n2); n3 = 0; n4 = 0; E::Periodic(k)
-            } else {
-                nn[2] = n2;
-                if n3 <= 0 { k = 3; d = idx(-n3); n4 = 0; E::Periodic(k) }
-                else {
-                    nn[3] = n3;
-                    if n4 <= 0 { k = 4; d = idx(-n4); E::Periodic(k) }
-                    else { k = 0; nn[4] = n4; d = 4; E::Done }
-                }
-            };
-            if d == 0 { assert!(k > 0); d = k - 1; E::Done } else { r } }
-        {
-            // [Compute component sizes periodically for d dimensions 12]
-
-            // At this point, nn [1] through nn [k − 1] are the
-            // component sizes that should be replicated periodically.
-            //
-            // In unusual cases, the number of dimensions might not be
-            // as large as the number of specifications.
-            if idx(d) > MAX_D { panic!("bad_specs d: {}", d); }
-            for (j,k) in (k..idx(d+1)).enumerate() { nn[k] = nn[j+1] }
+        // let dbd = decode_the_board_size_paramaeters(n1, n2, n3, n4);
+        let &mut Context { ref mut nn, .. } = self;
+        let d = bd.num_dims();
+        if d > MAX_D {
+            panic!("bad_specs d: {}", d);
         }
+        bd.fill_dims(|dim, k| {
+            nn[k+1] = dim;
+        });
 
-        (n1, n2, n3, n4, piece, d)
+        (piece, d)
     }
 
     /// [Grids and game boards. The subroutine call]
@@ -302,9 +381,14 @@ impl Context {
     /// get a circuit (undirected) or a cycle (directed) of length n,
     /// you can say `board(n,0,0,0,1,1,0)` and `board(n,0,0,0,1,1,1)`,
     /// respectively.
-    fn board(&mut self, n1: Long, n2: Long, n3: Long, n4: Long,
-             piece: Long, wrap: Long, directed: Long) -> Graph {
-        let directed = directed != 0;
+    fn board<BD>(&mut self, bd: BD) -> Graph where BD: BoardDescription {
+        // , n1: Long, n2: Long, n3: Long, n4: Long,
+        // piece: Long, wrap: Long, directed: Long) -> Graph where
+
+        let piece = bd.piece();
+        let wrap = bd.wrap();
+        let directed = bd.directed();
+
         let mut vertices;
         let mut new_graph: Graph; // the graph being constructed
         // all-purpose indices
@@ -313,8 +397,8 @@ impl Context {
         let mut p: Long; // |piece|
 
         // d is the number of dimensions
-        let (n1, n2, n3, n4, piece, d) =
-            self.normalize_the_board_size_parameters(n1, n2, n3, n4, piece);
+        let (piece, d) =
+            self.normalize_the_board_size_parameters(bd.dims(), piece);
 
         let &mut Context {
             ref area, ref mut nn, ref mut wr,
@@ -338,9 +422,7 @@ impl Context {
             n *= nn[j];
         }
         vertices = Graph::new_vertices(n);
-        let new_graph_id = format!("board({},{},{},{},{},{},{})",
-                                   n1, n2, n3, n4, piece, wrap,
-                                   if directed { 1 } else { 0 });
+        let new_graph_id = bd.id();
         let new_graph_util_types = [Z,Z,Z,I,I,I,Z,Z,Z,Z,Z,Z,Z,Z];
         debug!("created {} vertices for graph {}", n, new_graph_id);
 
@@ -536,14 +618,14 @@ impl Context {
 #[test]
 fn board_tricky_spec() {
     let mut c = Context::new();
-    let b = c.board(2,3,5,-7, 1, 0, 0);
+    let b = c.board((2,3,5,-7, 1, 0, 0));
     assert_eq!(b.vertices().len(), 1800);
 }
 
 #[test]
 fn board_2x2_wazir() {
     let mut c = Context::new();
-    let b = c.board(2,2,0,0, 1, 0, 0);
+    let b = c.board((2,2,0,0, 1, 0, 0));
     println!("b: {:E}", b);
     // CC
     // CC, C = 2; C * 4 = 8
@@ -553,7 +635,7 @@ fn board_2x2_wazir() {
 #[test]
 fn board_3x3_wazir() {
     let mut c = Context::new();
-    let b = c.board(3,3,0,0, 1, 0, 0);
+    let b = c.board((3,3,0,0, 1, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -564,7 +646,7 @@ fn board_3x3_wazir() {
 #[test]
 fn board_4x3_wazir() {
     let mut c = Context::new();
-    let b = c.board(4,3,0,0, 1, 0, 0);
+    let b = c.board((4,3,0,0, 1, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // XMMX
@@ -575,7 +657,7 @@ fn board_4x3_wazir() {
 #[test]
 fn board_2x2_fers() {
     let mut c = Context::new();
-    let b = c.board(2,2,0,0, 2, 0, 0);
+    let b = c.board((2,2,0,0, 2, 0, 0));
     println!("b: {:E}", b);
     // CC
     // CC, C = 1; C * 4 = 4
@@ -585,7 +667,7 @@ fn board_2x2_fers() {
 #[test]
 fn board_3x2_fers() {
     let mut c = Context::new();
-    let b = c.board(3,2,0,0, 2, 0, 0);
+    let b = c.board((3,2,0,0, 2, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // CXC, C = 1, X = 2; C*4 + X*2  = 4 + 4 = 8
@@ -595,7 +677,7 @@ fn board_3x2_fers() {
 #[test]
 fn board_3x3_fers() {
     let mut c = Context::new();
-    let b = c.board(3,3,0,0, 2, 0, 0);
+    let b = c.board((3,3,0,0, 2, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -606,7 +688,7 @@ fn board_3x3_fers() {
 #[test]
 fn board_4x3_fers() {
     let mut c = Context::new();
-    let b = c.board(4,3,0,0, 2, 0, 0);
+    let b = c.board((4,3,0,0, 2, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // XMMX
@@ -617,7 +699,7 @@ fn board_4x3_fers() {
 #[test]
 fn board_3x3_knight() {
     let mut c = Context::new();
-    let b = c.board(3,3,0,0, 5, 0, 0);
+    let b = c.board((3,3,0,0, 5, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -628,7 +710,7 @@ fn board_3x3_knight() {
 #[test]
 fn board_4x3_knight() {
     let mut c = Context::new();
-    let b = c.board(4,3,0,0, 5, 0, 0);
+    let b = c.board((4,3,0,0, 5, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // SMMS
@@ -640,7 +722,7 @@ fn board_4x3_knight() {
 #[test]
 fn board_3x3x3_fers() {
     let mut c = Context::new();
-    let b = c.board(3,3,3,0, 3, 0, 0);
+    let b = c.board((3,3,3,0, 3, 0, 0));
     println!("b: {:E}", b);
 
     //          CEC     (Z=2)
@@ -661,7 +743,7 @@ fn board_3x3x3_fers() {
 #[test]
 fn board_3x3_rook() {
     let mut c = Context::new();
-    let b = c.board(3,3,0,0, -1, 0, 0);
+    let b = c.board((3,3,0,0, -1, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -672,7 +754,7 @@ fn board_3x3_rook() {
 #[test]
 fn board_3x3_bishop() {
     let mut c = Context::new();
-    let b = c.board(3,3,0,0, -2, 0, 0);
+    let b = c.board((3,3,0,0, -2, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -683,7 +765,7 @@ fn board_3x3_bishop() {
 #[test]
 fn board_4x3_bishop() {
     let mut c = Context::new();
-    let b = c.board(4,3,0,0, -2, 0, 0);
+    let b = c.board((4,3,0,0, -2, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // SMMS
@@ -695,7 +777,7 @@ fn board_4x3_bishop() {
 #[test]
 fn board_5x4_nightrider() {
     let mut c = Context::new();
-    let b = c.board(5,4,0,0, -5, 0, 0);
+    let b = c.board((5,4,0,0, -5, 0, 0));
     println!("b: {} {:E}", b.id, b);
 
     // A nightrider is a knight whose basic move can be repeated in
