@@ -459,11 +459,12 @@ impl<'v> Graph<'v>  {
 }
 
 impl<'v> Graph<'v> {
-    fn edges(&self) -> EdgeIterator<'v> {
+    pub fn edges(&self) -> EdgeIterator<'v> {
+        let vertices = &self.vertices;
         EdgeIterator {
-            vertices: self.vertices,
+            vertices: *vertices,
             curr_ver: 0,
-            next_ver: 1,
+            next_ver: 0,
             next_arc: None,
         }
     }

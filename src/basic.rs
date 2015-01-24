@@ -442,5 +442,5 @@ fn board_2x2_wazir() {
     let mut c = Context::new();
     let b = c.board(2,2,0,0, 1, 0, false);
     println!("b: {:E}", b);
-    panic!("b: {}", b.id);
+    assert_eq!(b.edges().count(), 8);
 }
