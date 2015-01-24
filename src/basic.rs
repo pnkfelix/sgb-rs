@@ -90,6 +90,74 @@ impl Classic for Context {
     }
 }
 
+struct Repeating(usize);
+impl Repeating { fn len(&self) -> usize { self.0 } }
+
+pub trait BoardDimensions {
+    fn num_dims(&self) -> usize;
+    // calls `f` once for each dimension, passing the dimension's size
+    // as well as its (zero-based) index in whole dimensional space.
+    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize);
+}
+
+impl BoardDimensions for (Long,) {
+    fn num_dims(&self) -> usize { 1 }
+    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+        f(self.0, 0);
+    }
+}
+
+impl BoardDimensions for (Long,Long) {
+    fn num_dims(&self) -> usize { 2 }
+    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+        f(self.0, 0); f(self.1, 1);
+    }
+}
+
+impl BoardDimensions for (Long,Long,Long) {
+    fn num_dims(&self) -> usize { 3 }
+    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+        f(self.0, 0); f(self.1, 1); f(self.2, 2);
+    }
+}
+
+impl BoardDimensions for (Long,Long,Long,Long) {
+    fn num_dims(&self) -> usize { 4 }
+    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+        f(self.0, 0); f(self.1, 1); f(self.2, 2); f(self.3, 4);
+    }
+}
+
+impl BoardDimensions for (Repeating,Long) {
+    fn num_dims(&self) -> usize { 1 }
+    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+        let n = [self.1];
+        for k in 0..self.0.len() {
+            f(n[k % self.0.len()], k);
+        }
+    }
+}
+
+impl BoardDimensions for (Repeating,Long,Long) {
+    fn num_dims(&self) -> usize { 1 }
+    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+        let n = [self.1, self.2];
+        for k in 0..self.0.len() {
+            f(n[k % self.0.len()], k);
+        }
+    }
+}
+
+impl BoardDimensions for (Repeating,Long,Long,Long) {
+    fn num_dims(&self) -> usize { 1 }
+    fn fill_dims<F>(&self, f: F) where F: Fn(Long, usize) {
+        let n = [self.1, self.2, self.3];
+        for k in 0..self.0.len() {
+            f(n[k % self.0.len()], k);
+        }
+    }
+}
+
 impl Context {
     fn normalize_the_board_size_parameters(
         &mut self, mut n1: Long, mut n2: Long, mut n3: Long, mut n4: Long,
