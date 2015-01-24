@@ -103,8 +103,20 @@ enum Moves {
     Loop(u32),
 }
 
+impl Moves {
+    fn basic_euclidean_distance(&self) -> u32 {
+        match *self {
+            Moves::Once(d) => d,
+            Moves::Loop(d) => d,
+        }
+    }
+}
+
 trait Piece {
     fn moves(&self) -> Moves;
+    fn loops(&self) -> bool {
+        match self.moves() { Moves::Loop(_) => true, Moves::Once(_) => false }
+    }
 }
 
 impl Piece for Long {
@@ -123,8 +135,9 @@ impl Piece for Moves {
 
 pub trait BoardDescription {
     type Dims: BoardDimensions + fmt::Show;
+    type Piece: Piece;
     fn id(&self) -> String;
-    fn piece(&self) -> Long;
+    fn piece(&self) -> Self::Piece;
     fn wrap(&self) -> Long;
     fn directed(&self) -> bool;
     fn dims(&self) -> Self::Dims;
@@ -133,6 +146,7 @@ pub trait BoardDescription {
 // n1: n2: n3: n4: piece: wrap: directed
 impl BoardDescription for (Long, Long, Long, Long, Long, Long, Long) {
     type Dims = DynamicBoardDimensions;
+    type Piece = Long;
     fn id(&self) -> String {
         let (n1, n2, n3, n4, piece, wrap, directed) = *self;
         format!("board({},{},{},{},{},{},{})",
@@ -149,6 +163,7 @@ impl BoardDescription for (Long, Long, Long, Long, Long, Long, Long) {
 // n1: n2: n3: n4: piece: wrap: directed
 impl BoardDescription for (Long, Long, Long, Long, Long, Long, bool) {
     type Dims = DynamicBoardDimensions;
+    type Piece = Long;
     fn id(&self) -> String {
         let (n1, n2, n3, n4, piece, wrap, directed) = *self;
         format!("board({},{},{},{},{},{},{})",
@@ -165,6 +180,7 @@ impl BoardDescription for (Long, Long, Long, Long, Long, Long, bool) {
 // dims; piece; wrap; directed
 impl<MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, Long, Long, bool) {
     type Dims = MyDims;
+    type Piece = Long;
     fn id(&self) -> String {
         let (ref dims, piece, wrap, directed) = *self;
         format!("board({},{},{},{})",
@@ -181,6 +197,7 @@ impl<MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, Long,
 // dims; piece; wrap; directed
 impl<MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, Long, Long, Long) {
     type Dims = MyDims;
+    type Piece = Long;
     fn id(&self) -> String {
         let (ref dims, piece, wrap, directed) = *self;
         format!("board({},{},{},{})",
@@ -361,7 +378,7 @@ fn decode_the_board_size_parameters(
 impl Context {
 
     fn normalize_the_board_size_parameters<BD:BoardDimensions+fmt::Show>(
-        &mut self, bd: BD, piece: Long) -> (Long, usize) {
+        &mut self, bd: BD) -> usize {
         debug!("normalize_the_board_size_parameters bd={:?}", bd);
 
         // [Normalize the board size parameters 11]
@@ -377,7 +394,7 @@ impl Context {
             nn[k+1] = dim;
         });
 
-        (piece, d)
+        d
     }
 
     /// [Grids and game boards. The subroutine call]
@@ -496,11 +513,10 @@ impl Context {
         // all-purpose indices
         let mut j: Long; let mut k: usize;
 
-        let mut p: Long; // |piece|
+        let mut p: u32; // |piece|
 
         // d is the number of dimensions
-        let (piece, d) =
-            self.normalize_the_board_size_parameters(bd.dims(), piece);
+        let d = self.normalize_the_board_size_parameters(bd.dims());
 
         let &mut Context {
             ref area, ref mut nn, ref mut wr,
@@ -612,12 +628,11 @@ impl Context {
         }
         sig[0] = 0; del[0] = 0; sig[d+1] = 0;
 
-        p = piece;
-        if p < 0 { p = -p; }
+        p = piece.moves().basic_euclidean_distance();
         loop {
             // [Advance to the next nonnegative |del| vector, or |break| if done 17];
             k = d;
-            while (sig[k] + (del[k] + 1) * (del[k] + 1)) > p {
+            while (sig[k] + (del[k] + 1) * (del[k] + 1)) > p.to_i32().unwrap() {
                 del[k] = 0;
                 k -= 1;
             }
@@ -625,7 +640,7 @@ impl Context {
             del[k] += 1;
             sig[k + 1] = sig[k] + del[k] * del[k];
             for k in k+1..d+1 { sig[k+1] = sig[k]; }
-            if sig[d+1] < p { continue; }
+            if sig[d+1] < p.to_i32().unwrap() { continue; }
             debug!("  Advanced to next nonneg del vector, del={:?}",
                    &del[1us..idx(d+1)]);
             loop {
@@ -668,7 +683,7 @@ impl Context {
                             }
                         }
 
-                        if piece < 0 {
+                        if piece.loops() {
                             // [Go to no_more if yy == xx 21]
                             if (1..d+1).all(|k| yy[k] == xx[k]) {
                                 break 'gen_moves_from_v;
@@ -686,7 +701,7 @@ impl Context {
                             new_graph.new_edge(v, &vertices[idx(j)], l);
                         }
 
-                        if piece > 0 { break 'gen_moves_from_v; }
+                        if !piece.loops() { break 'gen_moves_from_v; }
                         for k in 1..d+1 { yy[k] += del[k]; }
                     }
                     // 'no_more:
