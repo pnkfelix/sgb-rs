@@ -64,21 +64,26 @@ impl Context {
     }
 }
 
-impl Context {
-    pub fn simplex(&mut self) -> Graph { unimplemented!() }
-    pub fn subsets(&mut self) -> Graph { unimplemented!() }
-    pub fn perms(&mut self) -> Graph { unimplemented!() }
-    pub fn parts(&mut self) -> Graph { unimplemented!() }
-    pub fn binary(&mut self) -> Graph { unimplemented!() }
-    pub fn complement(&mut self) -> Graph { unimplemented!() }
-    pub fn gunion(&mut self) -> Graph { unimplemented!() }
-    pub fn intersection(&mut self) -> Graph { unimplemented!() }
-    pub fn lines(&mut self) -> Graph { unimplemented!() }
-    pub fn product(&mut self) -> Graph { unimplemented!() }
-    pub fn induced(&mut self) -> Graph { unimplemented!() }
+/// Classic interface for SGB basic functions.  Notably, all
+/// parameters are all numerically oriented.
+trait Classic {
+    fn board(&mut self, n1: Long, n2: Long, n3: Long, n4: Long,
+             piece: Long, wrap: Long, directed: Long) -> Graph;
+
+    fn simplex(&mut self) -> Graph { unimplemented!() }
+    fn subsets(&mut self) -> Graph { unimplemented!() }
+    fn perms(&mut self) -> Graph { unimplemented!() }
+    fn parts(&mut self) -> Graph { unimplemented!() }
+    fn binary(&mut self) -> Graph { unimplemented!() }
+    fn complement(&mut self) -> Graph { unimplemented!() }
+    fn gunion(&mut self) -> Graph { unimplemented!() }
+    fn intersection(&mut self) -> Graph { unimplemented!() }
+    fn lines(&mut self) -> Graph { unimplemented!() }
+    fn product(&mut self) -> Graph { unimplemented!() }
+    fn induced(&mut self) -> Graph { unimplemented!() }
 }
 
-impl Context {
+impl Classic for Context {
     /// [Grids and game boards. The subroutine call]
     /// `board(n1,n2,n3,n4,piece,wrap,directed)` constructs a graph
     /// based on the moves of generalized chesspieces on a generalized
@@ -182,8 +187,9 @@ impl Context {
     /// get a circuit (undirected) or a cycle (directed) of length n,
     /// you can say `board(n,0,0,0,1,1,0)` and `board(n,0,0,0,1,1,1)`,
     /// respectively.
-    pub fn board(&mut self, mut n1: Long, mut n2: Long, mut n3: Long, mut n4: Long,
-             mut piece: Long, wrap: Long, directed: bool) -> Graph {
+    fn board(&mut self, mut n1: Long, mut n2: Long, mut n3: Long, mut n4: Long,
+             mut piece: Long, wrap: Long, directed: Long) -> Graph {
+        let directed = directed != 0;
         let mut vertices;
         let mut new_graph: Graph; // the graph being constructed
         // all-purpose indices
@@ -443,14 +449,14 @@ impl Context {
 #[test]
 fn board_tricky_spec() {
     let mut c = Context::new();
-    let b = c.board(2,3,5,-7, 1, 0, false);
+    let b = c.board(2,3,5,-7, 1, 0, 0);
     assert_eq!(b.vertices().len(), 1800);
 }
 
 #[test]
 fn board_2x2_wazir() {
     let mut c = Context::new();
-    let b = c.board(2,2,0,0, 1, 0, false);
+    let b = c.board(2,2,0,0, 1, 0, 0);
     println!("b: {:E}", b);
     // CC
     // CC, C = 2; C * 4 = 8
@@ -460,7 +466,7 @@ fn board_2x2_wazir() {
 #[test]
 fn board_3x3_wazir() {
     let mut c = Context::new();
-    let b = c.board(3,3,0,0, 1, 0, false);
+    let b = c.board(3,3,0,0, 1, 0, 0);
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -471,7 +477,7 @@ fn board_3x3_wazir() {
 #[test]
 fn board_4x3_wazir() {
     let mut c = Context::new();
-    let b = c.board(4,3,0,0, 1, 0, false);
+    let b = c.board(4,3,0,0, 1, 0, 0);
     println!("b: {:E}", b);
     // CXXC
     // XMMX
@@ -482,7 +488,7 @@ fn board_4x3_wazir() {
 #[test]
 fn board_2x2_fers() {
     let mut c = Context::new();
-    let b = c.board(2,2,0,0, 2, 0, false);
+    let b = c.board(2,2,0,0, 2, 0, 0);
     println!("b: {:E}", b);
     // CC
     // CC, C = 1; C * 4 = 4
@@ -492,7 +498,7 @@ fn board_2x2_fers() {
 #[test]
 fn board_3x2_fers() {
     let mut c = Context::new();
-    let b = c.board(3,2,0,0, 2, 0, false);
+    let b = c.board(3,2,0,0, 2, 0, 0);
     println!("b: {:E}", b);
     // CXC
     // CXC, C = 1, X = 2; C*4 + X*2  = 4 + 4 = 8
@@ -502,7 +508,7 @@ fn board_3x2_fers() {
 #[test]
 fn board_3x3_fers() {
     let mut c = Context::new();
-    let b = c.board(3,3,0,0, 2, 0, false);
+    let b = c.board(3,3,0,0, 2, 0, 0);
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -513,7 +519,7 @@ fn board_3x3_fers() {
 #[test]
 fn board_4x3_fers() {
     let mut c = Context::new();
-    let b = c.board(4,3,0,0, 2, 0, false);
+    let b = c.board(4,3,0,0, 2, 0, 0);
     println!("b: {:E}", b);
     // CXXC
     // XMMX
@@ -524,7 +530,7 @@ fn board_4x3_fers() {
 #[test]
 fn board_3x3_knight() {
     let mut c = Context::new();
-    let b = c.board(3,3,0,0, 5, 0, false);
+    let b = c.board(3,3,0,0, 5, 0, 0);
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -535,7 +541,7 @@ fn board_3x3_knight() {
 #[test]
 fn board_4x3_knight() {
     let mut c = Context::new();
-    let b = c.board(4,3,0,0, 5, 0, false);
+    let b = c.board(4,3,0,0, 5, 0, 0);
     println!("b: {:E}", b);
     // CXXC
     // SMMS
@@ -547,7 +553,7 @@ fn board_4x3_knight() {
 #[test]
 fn board_3x3x3_fers() {
     let mut c = Context::new();
-    let b = c.board(3,3,3,0, 3, 0, false);
+    let b = c.board(3,3,3,0, 3, 0, 0);
     println!("b: {:E}", b);
 
     //          CEC     (Z=2)
@@ -568,7 +574,7 @@ fn board_3x3x3_fers() {
 #[test]
 fn board_3x3_rook() {
     let mut c = Context::new();
-    let b = c.board(3,3,0,0, -1, 0, false);
+    let b = c.board(3,3,0,0, -1, 0, 0);
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -579,7 +585,7 @@ fn board_3x3_rook() {
 #[test]
 fn board_3x3_bishop() {
     let mut c = Context::new();
-    let b = c.board(3,3,0,0, -2, 0, false);
+    let b = c.board(3,3,0,0, -2, 0, 0);
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -590,7 +596,7 @@ fn board_3x3_bishop() {
 #[test]
 fn board_4x3_bishop() {
     let mut c = Context::new();
-    let b = c.board(4,3,0,0, -2, 0, false);
+    let b = c.board(4,3,0,0, -2, 0, 0);
     println!("b: {:E}", b);
     // CXXC
     // SMMS
@@ -602,7 +608,7 @@ fn board_4x3_bishop() {
 #[test]
 fn board_5x4_nightrider() {
     let mut c = Context::new();
-    let b = c.board(5,4,0,0, -5, 0, false);
+    let b = c.board(5,4,0,0, -5, 0, 0);
     println!("b: {} {:E}", b.id, b);
 
     // A nightrider is a knight whose basic move can be repeated in
