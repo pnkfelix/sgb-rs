@@ -5,7 +5,7 @@
 //! Simple examples of the use of these routines can be found in the
 //! demonstration programs {\sc QUEEN} and {\sc QUEEN\_WRAP}.
 
-use ::{Long, idx};
+use ::{Long, idx, long};
 use graph::{Area, Graph, Util};
 use graph::UtilType::{Z,I};
 
@@ -134,11 +134,47 @@ impl BoardDescription for (Long, Long, Long, Long, Long, Long, bool) {
     }
 }
 
+// dims; piece; wrap; directed
+impl<MyDims:BoardDimensions> BoardDescription for (MyDims, Long, Long, bool) {
+    type Dims = MyDims;
+    fn id(&self) -> String {
+        let (ref dims, piece, wrap, directed) = *self;
+        format!("board({},{},{},{})",
+                dims.partial_id(), piece, wrap, if directed { 1 } else { 0 })
+    }
+    fn piece(&self) -> Long { self.1 }
+    fn wrap(&self) -> Long { self.2 }
+    fn directed(&self) -> bool { self.3 }
+    fn dims(&self) -> MyDims {
+        self.dims()
+    }
+}
+
+// dims; piece; wrap; directed
+impl<MyDims:BoardDimensions> BoardDescription for (MyDims, Long, Long, Long) {
+    type Dims = MyDims;
+    fn id(&self) -> String {
+        let (ref dims, piece, wrap, directed) = *self;
+        format!("board({},{},{},{})",
+                dims.partial_id(), piece, wrap,
+                if directed != 0 { 1 } else { 0 })
+    }
+    fn piece(&self) -> Long { self.1 }
+    fn wrap(&self) -> Long { self.2 }
+    fn directed(&self) -> bool { self.3 != 0 }
+    fn dims(&self) -> MyDims {
+        self.dims()
+    }
+}
+
 pub trait BoardDimensions {
+    // how many dimensions are represented
     fn num_dims(&self) -> usize;
     // calls `f` once for each dimension, passing the dimension's size
     // as well as its (zero-based) index in whole dimensional space.
     fn fill_dims<F>(&self, f: F) where F: FnMut(Long, usize);
+    // what these dimensions contribute to the overall board ID string.
+    fn partial_id(&self) -> String;
 }
 
 enum DynamicBoardDimensions {
@@ -156,12 +192,18 @@ impl BoardDimensions for (Long,) {
     fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         f(self.0, 0);
     }
+    fn partial_id(&self) -> String {
+        format!("{},0,0,0", self.0)
+    }
 }
 
 impl BoardDimensions for (Long,Long) {
     fn num_dims(&self) -> usize { 2 }
     fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         f(self.0, 0); f(self.1, 1);
+    }
+    fn partial_id(&self) -> String {
+        format!("{},{},0,0", self.0, self.1)
     }
 }
 
@@ -170,12 +212,18 @@ impl BoardDimensions for (Long,Long,Long) {
     fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         f(self.0, 0); f(self.1, 1); f(self.2, 2);
     }
+    fn partial_id(&self) -> String {
+        format!("{},{},{},0", self.0, self.1, self.2)
+    }
 }
 
 impl BoardDimensions for (Long,Long,Long,Long) {
     fn num_dims(&self) -> usize { 4 }
     fn fill_dims<F>(&self, mut f: F) where F: FnMut(Long, usize) {
         f(self.0, 0); f(self.1, 1); f(self.2, 2); f(self.3, 4);
+    }
+    fn partial_id(&self) -> String {
+        format!("{},{},{},{}", self.0, self.1, self.2, self.3)
     }
 }
 
@@ -187,6 +235,9 @@ impl BoardDimensions for (Repeating,Long) {
             f(n[k % 1], k);
         }
     }
+    fn partial_id(&self) -> String {
+        format!("{},{},0,0", self.1, -long(self.0.len()))
+    }
 }
 
 impl BoardDimensions for (Repeating,Long,Long) {
@@ -197,6 +248,9 @@ impl BoardDimensions for (Repeating,Long,Long) {
             f(n[k % 2], k);
         }
     }
+    fn partial_id(&self) -> String {
+        format!("{},{},{},0", self.1, self.2, -long(self.0.len()))
+    }
 }
 
 impl BoardDimensions for (Repeating,Long,Long,Long) {
@@ -206,6 +260,9 @@ impl BoardDimensions for (Repeating,Long,Long,Long) {
         for k in 0..self.0.len() {
             f(n[k % 3], k);
         }
+    }
+    fn partial_id(&self) -> String {
+        format!("{},{},{},{}", self.1, self.2, self.3, -long(self.0.len()))
     }
 }
 
@@ -233,6 +290,19 @@ impl BoardDimensions for DynamicBoardDimensions {
             Loop1(ref t) => t.fill_dims(f),
             Loop2(ref t) => t.fill_dims(f),
             Loop3(ref t) => t.fill_dims(f),
+        }
+    }
+
+    fn partial_id(&self) -> String {
+        use self::DynamicBoardDimensions::*;
+        match *self {
+            Once1(ref t) => t.partial_id(),
+            Once2(ref t) => t.partial_id(),
+            Once3(ref t) => t.partial_id(),
+            Once4(ref t) => t.partial_id(),
+            Loop1(ref t) => t.partial_id(),
+            Loop2(ref t) => t.partial_id(),
+            Loop3(ref t) => t.partial_id(),
         }
     }
 }
