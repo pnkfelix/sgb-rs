@@ -438,9 +438,187 @@ impl Context {
 }
 
 #[test]
+fn board_tricky_spec() {
+    let mut c = Context::new();
+    let b = c.board(2,3,5,-7, 1, 0, false);
+    assert_eq!(b.vertices().len(), 1800);
+}
+
+#[test]
 fn board_2x2_wazir() {
     let mut c = Context::new();
     let b = c.board(2,2,0,0, 1, 0, false);
     println!("b: {:E}", b);
+    // CC
+    // CC, C = 2; C * 4 = 8
     assert_eq!(b.edges().count(), 8);
 }
+
+#[test]
+fn board_3x3_wazir() {
+    let mut c = Context::new();
+    let b = c.board(3,3,0,0, 1, 0, false);
+    println!("b: {:E}", b);
+    // CXC
+    // XMX
+    // CXC, C = 2, M = 4, X = 3; C*4 + X*4 + M = 8 + 12 + 3 = 24
+    assert_eq!(b.edges().count(), 24);
+}
+
+#[test]
+fn board_4x3_wazir() {
+    let mut c = Context::new();
+    let b = c.board(4,3,0,0, 1, 0, false);
+    println!("b: {:E}", b);
+    // CXXC
+    // XMMX
+    // CXXC, C = 2, M = 4, X = 3; C*4 + X*6 + M*2 = 8 + 18 + 8 = 34
+    assert_eq!(b.edges().count(), 34);
+}
+
+#[test]
+fn board_2x2_fers() {
+    let mut c = Context::new();
+    let b = c.board(2,2,0,0, 2, 0, false);
+    println!("b: {:E}", b);
+    // CC
+    // CC, C = 1; C * 4 = 4
+    assert_eq!(b.edges().count(), 4);
+}
+
+#[test]
+fn board_3x2_fers() {
+    let mut c = Context::new();
+    let b = c.board(3,2,0,0, 2, 0, false);
+    println!("b: {:E}", b);
+    // CXC
+    // CXC, C = 1, X = 2; C*4 + X*2  = 4 + 4 = 8
+    assert_eq!(b.edges().count(), 8);
+}
+
+#[test]
+fn board_3x3_fers() {
+    let mut c = Context::new();
+    let b = c.board(3,3,0,0, 2, 0, false);
+    println!("b: {:E}", b);
+    // CXC
+    // XMX
+    // CXC, C = 1, M = 4, X = 2; C*4 + X*4 + M = 4 + 8 + 4 = 16
+    assert_eq!(b.edges().count(), 16);
+}
+
+#[test]
+fn board_4x3_fers() {
+    let mut c = Context::new();
+    let b = c.board(4,3,0,0, 2, 0, false);
+    println!("b: {:E}", b);
+    // CXXC
+    // XMMX
+    // CXXC, C = 1, M = 4, X = 2; C*4 + X*6 + M*2 = 4 + 12 + 8 = 24
+    assert_eq!(b.edges().count(), 24);
+}
+
+#[test]
+fn board_3x3_knight() {
+    let mut c = Context::new();
+    let b = c.board(3,3,0,0, 5, 0, false);
+    println!("b: {:E}", b);
+    // CXC
+    // XMX
+    // CXC, C = 2, X = 2, M = 0; C*4 + X*4 + M*1 = 8 + 8 + 0 = 16
+    assert_eq!(b.edges().count(), 16);
+}
+
+#[test]
+fn board_4x3_knight() {
+    let mut c = Context::new();
+    let b = c.board(4,3,0,0, 5, 0, false);
+    println!("b: {:E}", b);
+    // CXXC
+    // SMMS
+    // CXXC, C = 2, S = 2, X = 3, M = 2;
+    //       C*4 + S*2 + X*4 + M*2 = 8 + 4 + 12 + 4 = 28
+    assert_eq!(b.edges().count(), 28);
+}
+
+#[test]
+fn board_3x3x3_fers() {
+    let mut c = Context::new();
+    let b = c.board(3,3,3,0, 3, 0, false);
+    println!("b: {:E}", b);
+
+    //          CEC     (Z=2)
+    //          ESE
+    //          CEC
+    //
+    //      ESE         (Z=1)
+    //      SMS
+    //      ESE
+    //
+    // CEC              (Z=0)
+    // ESE
+    // CEC, C = 1, E = 2, S = 4, M = 8;
+    //      C*8 + E*12 + S*6 + M = 8 + 24 + 24 + 8 = 64
+    assert_eq!(b.edges().count(), 64);
+}
+
+#[test]
+fn board_3x3_rook() {
+    let mut c = Context::new();
+    let b = c.board(3,3,0,0, -1, 0, false);
+    println!("b: {:E}", b);
+    // CXC
+    // XMX
+    // CXC, C = 4, X = 4, M = 4; C*4 + X*4 + M*1 = 16 + 16 + 4 = 36
+    assert_eq!(b.edges().count(), 36);
+}
+
+#[test]
+fn board_3x3_bishop() {
+    let mut c = Context::new();
+    let b = c.board(3,3,0,0, -2, 0, false);
+    println!("b: {:E}", b);
+    // CXC
+    // XMX
+    // CXC, C = 2, X = 2, M = 4; C*4 + X*4 + M*1 = 8 + 8 + 4 = 20
+    assert_eq!(b.edges().count(), 20);
+}
+
+#[test]
+fn board_4x3_bishop() {
+    let mut c = Context::new();
+    let b = c.board(4,3,0,0, -2, 0, false);
+    println!("b: {:E}", b);
+    // CXXC
+    // SMMS
+    // CXXC, C = 2, S = 2, X = 3, M = 4;
+    //       C*4 + S*2 + X*4 + M*2 = 8 + 4 + 12 + 8 = 32
+    assert_eq!(b.edges().count(), 32);
+}
+
+#[test]
+fn board_5x4_nightrider() {
+    let mut c = Context::new();
+    let b = c.board(5,4,0,0, -5, 0, false);
+    println!("b: {} {:E}", b.id, b);
+
+    // A nightrider is a knight whose basic move can be repeated in
+    // the *same* direction.
+    //
+    // e.g. for a nightrider at `*`, its moves are labelled with `.`,
+    // here are its move on a 5x4 board.
+    //
+    // _.__.
+    // __.__
+    // *____
+    // __.__
+    //
+    //
+    // CEXEC
+    // SMJMS
+    // SMJMS
+    // CEXEC, C=3, S=4, E=3, X=4, M=4, J=6
+    //        C*4 + S*4 + E*4 + X*2 + M*4 + J*2 = 12+16+12+8+16+12 = 76
+    assert_eq!(b.edges().count(), 76);
+}
+
