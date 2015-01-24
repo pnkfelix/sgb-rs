@@ -279,7 +279,10 @@ impl Context {
                 q.push_str(format!(".{}", xx[k]).as_slice());
             }
             v.name = q.chars().skip(1).collect(); // omit char 0, which is '.'
-            v.x = Util::I(xx[1]); v.y = Util::I(xx[2]); v.z = Util::I(xx[3]);
+            v.util.x = Util::I(xx[1]);
+            v.util.y = Util::I(xx[2]);
+            v.util.z = Util::I(xx[3]);
+
             debug!("named vertex {}", v);
 
             let mut k = d;

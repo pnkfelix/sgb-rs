@@ -80,11 +80,18 @@ impl<'v> Default for Util<'v>  {
 /// out-degree, or whether a vertex is ‘marked’. Utility fields might
 /// also link the vertex to other vertices or arcs in one or more
 /// lists.
-pub struct Vertex<'v>  {
+pub struct Vertex<'v, Util:Default=UtilFields<'v>>  {
     /// linked-list of arcs coming out of this vertex
     arcs: Cell<Option<&'v Arc<'v>>>,
     /// string identifying this vertex symbolically
     pub name: String,
+
+    // utility fields, if any
+    pub util: Util,
+}
+
+#[derive(Default)]
+pub struct UtilFields<'v> {
     /// multipurpose field
     pub u: Util<'v>,
     /// multipurpose field
@@ -104,12 +111,7 @@ impl<'v> Default for Vertex<'v>  {
         Vertex {
             arcs: Cell::new(None),
             name: String::new(),
-            u: Default::default(),
-            v: Default::default(),
-            w: Default::default(),
-            x: Default::default(),
-            y: Default::default(),
-            z: Default::default(),
+            util: Default::default(),
         }
     }
 }
