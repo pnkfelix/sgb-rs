@@ -6,6 +6,7 @@ use arena;
 use std::cell::Cell;
 use std::default::Default;
 use std::fmt;
+use std::iter;
 use std::mem;
 
 #[derive(Copy)]
@@ -457,6 +458,49 @@ impl<'v> Graph<'v>  {
     }
 }
 
+impl<'v> Graph<'v> {
+    fn edges(&self) -> EdgeIterator<'v> {
+        EdgeIterator {
+            vertices: self.vertices,
+            curr_ver: 0,
+            next_ver: 1,
+            next_arc: None,
+        }
+    }
+}
+
+pub struct EdgeIterator<'v> {
+    vertices: &'v [Vertex<'v>],
+    curr_ver: usize,
+    next_ver: usize,
+    next_arc: Option<&'v Arc<'v>>,
+}
+
+impl<'v> EdgeIterator<'v> {
+    fn try_fill_next_arc(&mut self) {
+        while self.next_arc.is_none() {
+            if self.next_ver >= self.vertices.len() { return; }
+            self.curr_ver = self.next_ver;
+            let v = &self.vertices[self.curr_ver];
+            self.next_ver += 1;
+            self.next_arc = v.arcs.get();
+        }
+    }
+}
+
+impl<'v> iter::Iterator for EdgeIterator<'v> {
+    type Item = (&'v Vertex<'v>, &'v Arc<'v>);
+    fn next(&mut self) -> Option<(&'v Vertex<'v>, &'v Arc<'v>)> {
+        self.try_fill_next_arc();
+        if let Some(a) = self.next_arc {
+            self.next_arc = a.next;
+            Some((&self.vertices[self.curr_ver], a))
+        } else {
+            None
+        }
+    }
+}
+
 impl<'v> fmt::String for Vertex<'v> {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         write!(w, "{}", self.name.as_slice())
@@ -475,14 +519,10 @@ impl<'v> fmt::UpperExp for Graph<'v> {
 
         try!(write!(w, "], edges: ["));
         let mut saw_edge = false;
-        for v in self.vertices.iter() {
-            let mut arc = &v.arcs.get();
-            while let &Some(a) = arc {
-                if saw_edge { try!(write!(w, ", ")); }
-                try!(write!(w, "{} -> {}", v, a.tip));
-                saw_edge = true;
-                arc = &a.next;
-            }
+        for (v, a) in self.edges() {
+            if saw_edge { try!(write!(w, ", ")); }
+            try!(write!(w, "{} -> {}", v, a.tip));
+            saw_edge = true;
         }
         write!(w, "] }}")
     }
