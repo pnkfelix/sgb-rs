@@ -459,6 +459,9 @@ impl<'v> Graph<'v>  {
 }
 
 impl<'v> Graph<'v> {
+    pub fn vertices(&self) -> &'v [Vertex<'v>] {
+        self.vertices.slice_to(self.n as usize)
+    }
     pub fn edges(&self) -> EdgeIterator<'v> {
         let vertices = &self.vertices;
         EdgeIterator {
