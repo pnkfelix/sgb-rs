@@ -97,11 +97,32 @@ impl Classic for Context {
 struct Repeating<I:Int>(I);
 impl<I:Int> Repeating<I> { fn len(&self) -> I { self.0 } }
 
-#[derive(Copy, Show)]
-enum Moves {
+#[derive(Copy,Clone,Show)]
+pub enum Moves {
     Once(u32),
     Loop(u32),
 }
+
+pub const WAZIR          : Moves = Moves::Once(1);
+pub const FERS           : Moves = Moves::Once(2);
+pub const DABBABA        : Moves = Moves::Once(4);
+pub const KNIGHT         : Moves = Moves::Once(5);
+pub const ALFIL          : Moves = Moves::Once(8);
+pub const CAMEL          : Moves = Moves::Once(10);
+pub const ZEBRA          : Moves = Moves::Once(13);
+pub const GIRAFFE        : Moves = Moves::Once(17);
+pub const FIVELEAPER     : Moves = Moves::Once(25);
+pub const ROOT_50_LEAPER : Moves = Moves::Once(50);
+
+pub const ROOK           : Moves = Moves::Loop(1);
+pub const BISHOP         : Moves = Moves::Loop(2);
+pub const UNICORN        : Moves = Moves::Loop(3);
+pub const DABBABARIDER   : Moves = Moves::Loop(4);
+pub const NIGHTRIDER     : Moves = Moves::Loop(5);
+pub const ALFILRIDER     : Moves = Moves::Loop(8);
+pub const CAMELRIDER     : Moves = Moves::Loop(10);
+pub const ZEBRARIDER     : Moves = Moves::Loop(13);
+pub const GIRAFFERIDER   : Moves = Moves::Loop(17);
 
 impl Moves {
     fn basic_euclidean_distance(&self) -> u32 {
@@ -117,6 +138,8 @@ trait Piece {
     fn loops(&self) -> bool {
         match self.moves() { Moves::Loop(_) => true, Moves::Once(_) => false }
     }
+    // what these dimensions contribute to the overall board ID string.
+    fn partial_id(&self) -> String;
 }
 
 impl Piece for Long {
@@ -127,15 +150,22 @@ impl Piece for Long {
             Moves::Once(self.to_u32().unwrap())
         }
     }
+    fn partial_id(&self) -> String { format!("{}", *self) }
 }
 
 impl Piece for Moves {
     fn moves(&self) -> Moves { *self }
+    fn partial_id(&self) -> String {
+        match *self {
+            Moves::Loop(d) => format!("{}", -d.to_i32().unwrap()),
+            Moves::Once(d) => format!("{}", d),
+        }
+    }
 }
 
 pub trait BoardDescription {
     type Dims: BoardDimensions + fmt::Show;
-    type Piece: Piece;
+    type Piece: Piece + fmt::Show;
     fn id(&self) -> String;
     fn piece(&self) -> Self::Piece;
     fn wrap(&self) -> Long;
@@ -144,15 +174,16 @@ pub trait BoardDescription {
 }
 
 // n1: n2: n3: n4: piece: wrap: directed
-impl BoardDescription for (Long, Long, Long, Long, Long, Long, Long) {
+impl<P:Piece+Clone+fmt::Show> BoardDescription for (Long, Long, Long, Long, P, Long, Long) {
     type Dims = DynamicBoardDimensions;
-    type Piece = Long;
+    type Piece = P;
     fn id(&self) -> String {
-        let (n1, n2, n3, n4, piece, wrap, directed) = *self;
+        let (n1, n2, n3, n4, ref piece, wrap, directed) = *self;
         format!("board({},{},{},{},{},{},{})",
-                n1, n2, n3, n4, piece, wrap, if directed != 0 { 1 } else { 0 })
+                n1, n2, n3, n4, piece.partial_id(), wrap,
+                if directed != 0 { 1 } else { 0 })
     }
-    fn piece(&self) -> Long { self.4 }
+    fn piece(&self) -> P { self.4.clone() }
     fn wrap(&self) -> Long { self.5 }
     fn directed(&self) -> bool { self.6 != 0 }
     fn dims(&self) -> DynamicBoardDimensions {
@@ -161,15 +192,16 @@ impl BoardDescription for (Long, Long, Long, Long, Long, Long, Long) {
 }
 
 // n1: n2: n3: n4: piece: wrap: directed
-impl BoardDescription for (Long, Long, Long, Long, Long, Long, bool) {
+impl<P:Piece+Clone+fmt::Show> BoardDescription for (Long, Long, Long, Long, P, Long, bool) {
     type Dims = DynamicBoardDimensions;
-    type Piece = Long;
+    type Piece = P;
     fn id(&self) -> String {
-        let (n1, n2, n3, n4, piece, wrap, directed) = *self;
+        let (n1, n2, n3, n4, ref piece, wrap, directed) = *self;
         format!("board({},{},{},{},{},{},{})",
-                n1, n2, n3, n4, piece, wrap, if directed { 1 } else { 0 })
+                n1, n2, n3, n4, piece.partial_id(),
+                wrap, if directed { 1 } else { 0 })
     }
-    fn piece(&self) -> Long { self.4 }
+    fn piece(&self) -> P { self.4.clone() }
     fn wrap(&self) -> Long { self.5 }
     fn directed(&self) -> bool { self.6 }
     fn dims(&self) -> DynamicBoardDimensions {
@@ -178,15 +210,16 @@ impl BoardDescription for (Long, Long, Long, Long, Long, Long, bool) {
 }
 
 // dims; piece; wrap; directed
-impl<MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, Long, Long, bool) {
+impl<P:Piece+Clone+fmt::Show,MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, P, Long, bool) {
     type Dims = MyDims;
-    type Piece = Long;
+    type Piece = P;
     fn id(&self) -> String {
-        let (ref dims, piece, wrap, directed) = *self;
+        let (ref dims, ref piece, wrap, directed) = *self;
         format!("board({},{},{},{})",
-                dims.partial_id(), piece, wrap, if directed { 1 } else { 0 })
+                dims.partial_id(), piece.partial_id(),
+                wrap, if directed { 1 } else { 0 })
     }
-    fn piece(&self) -> Long { self.1 }
+    fn piece(&self) -> P { self.1.clone() }
     fn wrap(&self) -> Long { self.2 }
     fn directed(&self) -> bool { self.3 }
     fn dims(&self) -> MyDims {
@@ -195,16 +228,16 @@ impl<MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, Long,
 }
 
 // dims; piece; wrap; directed
-impl<MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, Long, Long, Long) {
+impl<P:Piece+Clone+fmt::Show,MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, P, Long, Long) {
     type Dims = MyDims;
-    type Piece = Long;
+    type Piece = P;
     fn id(&self) -> String {
-        let (ref dims, piece, wrap, directed) = *self;
+        let (ref dims, ref piece, wrap, directed) = *self;
         format!("board({},{},{},{})",
-                dims.partial_id(), piece, wrap,
+                dims.partial_id(), piece.partial_id(), wrap,
                 if directed != 0 { 1 } else { 0 })
     }
-    fn piece(&self) -> Long { self.1 }
+    fn piece(&self) -> P { self.1.clone() }
     fn wrap(&self) -> Long { self.2 }
     fn directed(&self) -> bool { self.3 != 0 }
     fn dims(&self) -> MyDims {
@@ -505,6 +538,7 @@ impl Context {
         // piece: Long, wrap: Long, directed: Long) -> Graph where
 
         let piece = bd.piece();
+        println!("board piece={:?}", piece);
         let wrap = bd.wrap();
         let directed = bd.directed();
 
@@ -749,7 +783,7 @@ fn board_tricky_spec_decoded() {
 #[test]
 fn board_2x2_wazir() {
     let mut c = Context::new();
-    let b = c.board(((2,2), 1, 0, 0));
+    let b = c.board(((2,2), WAZIR, 0, 0));
     println!("b: {:E}", b);
     // CC
     // CC, C = 2; C * 4 = 8
@@ -759,7 +793,7 @@ fn board_2x2_wazir() {
 #[test]
 fn board_3x3_wazir() {
     let mut c = Context::new();
-    let b = c.board(((3,3), 1, 0, 0));
+    let b = c.board(((3,3), WAZIR, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -770,7 +804,7 @@ fn board_3x3_wazir() {
 #[test]
 fn board_4x3_wazir() {
     let mut c = Context::new();
-    let b = c.board(((4,3), 1, 0, 0));
+    let b = c.board(((4,3), WAZIR, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // XMMX
@@ -781,7 +815,7 @@ fn board_4x3_wazir() {
 #[test]
 fn board_2x2_fers() {
     let mut c = Context::new();
-    let b = c.board(((2,2), 2, 0, 0));
+    let b = c.board(((2,2), FERS, 0, 0));
     println!("b: {:E}", b);
     // CC
     // CC, C = 1; C * 4 = 4
@@ -791,7 +825,7 @@ fn board_2x2_fers() {
 #[test]
 fn board_3x2_fers() {
     let mut c = Context::new();
-    let b = c.board(((3,2), 2, 0, 0));
+    let b = c.board(((3,2), FERS, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // CXC, C = 1, X = 2; C*4 + X*2  = 4 + 4 = 8
@@ -801,7 +835,7 @@ fn board_3x2_fers() {
 #[test]
 fn board_3x3_fers() {
     let mut c = Context::new();
-    let b = c.board(((3,3), 2, 0, 0));
+    let b = c.board(((3,3), FERS, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -812,7 +846,7 @@ fn board_3x3_fers() {
 #[test]
 fn board_4x3_fers() {
     let mut c = Context::new();
-    let b = c.board(((4,3), 2, 0, 0));
+    let b = c.board(((4,3), FERS, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // XMMX
@@ -823,7 +857,7 @@ fn board_4x3_fers() {
 #[test]
 fn board_3x3_knight() {
     let mut c = Context::new();
-    let b = c.board(((3,3), 5, 0, 0));
+    let b = c.board(((3,3), KNIGHT, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -834,7 +868,7 @@ fn board_3x3_knight() {
 #[test]
 fn board_4x3_knight() {
     let mut c = Context::new();
-    let b = c.board(((4,3), 5, 0, 0));
+    let b = c.board(((4,3), KNIGHT, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // SMMS
@@ -844,8 +878,15 @@ fn board_4x3_knight() {
 }
 
 #[test]
-fn board_3x3x3_fers() {
+fn board_3x3x3_fers_3d() {
     let mut c = Context::new();
+
+    // we don't use FERS here, as that would move from (x,y,z) to
+    // (x+d_x,y+d_y,z+d_z) where [|d_x|,|d_y|,|d_z|] is some
+    // permutation of [1,1,0], and I want to force the piece to move
+    // diagonal along *all three* dimenions, which needs the piece
+    // value to be 3.
+
     let b = c.board(((3,3,3), 3, 0, 0));
     println!("b: {:E}", b);
 
@@ -867,7 +908,7 @@ fn board_3x3x3_fers() {
 #[test]
 fn board_3x3_rook() {
     let mut c = Context::new();
-    let b = c.board(((3,3), -1, 0, 0));
+    let b = c.board(((3,3), ROOK, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -878,7 +919,7 @@ fn board_3x3_rook() {
 #[test]
 fn board_3x3_bishop() {
     let mut c = Context::new();
-    let b = c.board(((3,3), -2, 0, 0));
+    let b = c.board(((3,3), BISHOP, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -889,7 +930,7 @@ fn board_3x3_bishop() {
 #[test]
 fn board_4x3_bishop() {
     let mut c = Context::new();
-    let b = c.board(((4,3), -2, 0, 0));
+    let b = c.board(((4,3), BISHOP, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // SMMS
@@ -901,7 +942,7 @@ fn board_4x3_bishop() {
 #[test]
 fn board_5x4_nightrider() {
     let mut c = Context::new();
-    let b = c.board(((5,4), -5, 0, 0));
+    let b = c.board(((5,4), NIGHTRIDER, 0, 0));
     println!("b: {} {:E}", b.id, b);
 
     // A nightrider is a knight whose basic move can be repeated in
