@@ -1,9 +1,7 @@
 use super::Long;
 
-use std::cell::Cell;
 use std::io::BufferedReader;
 use std::io::File;
-use std::io::IoResult;
 use std::num::ToPrimitive;
 
 /// The external variable io errors mentioned in the previous section
@@ -14,8 +12,8 @@ use std::num::ToPrimitive;
 /// binary form; system wizards who might need to do a bit of
 /// troubleshooting should be able to decode io errors without great
 /// pain
-#[derive(Show)]
-enum Error {
+#[derive(Copy, Show)]
+pub enum Error {
     /// bit set in io errors if fopen fails
     CantOpenFile         = 0x1,
     /// /∗ bit set if fclose fails ∗/
@@ -54,7 +52,7 @@ fn main_test() {
     c.close().unwrap()
 }
 
-struct Context {
+pub struct Context {
     io_errors: Long,
     filename: String,
     cur_file: BufferedReader<File>,
@@ -111,7 +109,7 @@ impl Context {
 }
 
 impl Context {
-    fn fill_buf(&mut self) {
+    pub fn fill_buf(&mut self) {
         match self.cur_file.read_line() {
             Ok(s) => {
                 println!("fill_buf read: {}", s);
@@ -148,7 +146,7 @@ impl Context {
 }
 
 /// large prime such that 2p + unexpected_char won't overflow
-static checksum_prime: Long = (1 << 30) - 83;
+const CHECKSUM_PRIME: Long = (1 << 30) - 83;
 
 /// The icode mapping is defined by a single string, imap, such that
 /// character imap[k] has icode value k. There are 96 characters in
@@ -167,16 +165,16 @@ static checksum_prime: Long = (1 << 30) - 83;
 /// it so that codes 0–15 come from the characters
 /// "0123456789ABCDEF". This facilitates conversion of decimal and
 /// hexadecimal data. We can also use it for radices higher than 16.
-static imap: &'static str =
+const IMAP: &'static str =
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ\
      abcdefghijklmnopqrstuvwxyz_^~&@,;.:?!%#$+-*/|\\<=>()[]{}`'\" \n";
-const unexpected_char: i8 = 127;
+const UNEXPECTED_CHAR: i8 = 127;
 
 pub fn imap_chr(d: Long) -> char {
-    if d < 0 || d as usize >= imap.len() {
+    if d < 0 || d as usize >= IMAP.len() {
         '\0'
     } else {
-        imap.char_at(d as usize)
+        IMAP.char_at(d as usize)
     }
 }
 
@@ -184,9 +182,9 @@ impl Context {
     pub fn imap_ord(&self, c: i8) -> Long {
         let c = c as Long;
         self.make_sure_that_icode_has_been_initialized();
-        (if (c < 0 || c > 255) {
+        (if c < 0 || c > 255 {
             debug!("imap_ord c: {} unexpected_char", c);
-            unexpected_char
+            UNEXPECTED_CHAR
         } else {
             let ret = self.icode[c as usize];
             debug!("imap_ord c: {} ret: {}", c, ret);
@@ -199,8 +197,8 @@ impl Context {
     }
 
     fn icode_setup() -> [i8; 256] {
-        let mut icode = [unexpected_char; 256];
-        for (k, p) in imap.bytes().enumerate() {
+        let mut icode = [UNEXPECTED_CHAR; 256];
+        for (k, p) in IMAP.bytes().enumerate() {
             println!("init icode[{}] = {}", p, k);
             icode[p as usize] = k.to_i8().unwrap();
         }
@@ -210,7 +208,7 @@ impl Context {
 
 impl Context {
     /// advance to the next line of the data file
-    fn newline(&mut self) {
+    pub fn newline(&mut self) {
         self.line_no += 1;
         if self.line_no > self.tot_lines {
             self.more_data = false;
@@ -234,13 +232,13 @@ impl Context {
             let imap_ord = self.imap_ord(p2);
             println!("checksum interm a: {} p: {} {} imap_ord: {}", a, p as char, p2, imap_ord);
                      
-            a = (a + a + imap_ord) % checksum_prime;
+            a = (a + a + imap_ord) % CHECKSUM_PRIME;
         }
         a
     }
 
     /// has the data all been read?
-    fn eof(&self) -> bool {
+    pub fn eof(&self) -> bool {
         !self.more_data
     }
 }
@@ -258,7 +256,7 @@ impl Context {
 /// beginning.
 impl Context {
     /// get next character of current line, or '\n'
-    fn char(&mut self) -> char {
+    pub fn char(&mut self) -> char {
         if self.cur_line_offset < self.cur_line.len().to_i8().unwrap() {
             let c = self.cur_line.char_at(self.cur_line_offset.to_uint().unwrap());
             self.cur_line_offset += 1;
@@ -269,7 +267,7 @@ impl Context {
     }
 
     /// move back ready to scan a character again
-    fn backup(&mut self) {
+    pub fn backup(&mut self) {
         if self.cur_line_offset > 0 {
             self.cur_line_offset -= 1;
         }
@@ -292,7 +290,7 @@ impl Context {
 impl Context {
     /// The value of d should be at most 127; in most applications, d
     /// is of course either 10 or 16.
-    fn digit(&mut self, d: i8) -> Long {
+    pub fn digit(&mut self, d: i8) -> Long {
         self.icode[0] = d; // make sure ’\0’ is a nondigit
         let cur_pos = (self.cur_pos() as u32).to_i8().unwrap();
         if self.imap_ord(cur_pos) < d.to_i32().unwrap() {
@@ -304,11 +302,11 @@ impl Context {
         }
     }
 
-    fn number(&mut self, d: i8) -> Long {
+    pub fn number(&mut self, d: i8) -> Long {
         let mut a: Long = 0;
         self.icode[0] = d; // make sure ’\0’ is a nondigit
         let d = d as Long;
-        debug!("imap: {}", imap);
+        debug!("imap: {}", IMAP);
         debug!("icode: {:?}", self.icode.as_slice());
         loop {
             let c = self.cur_pos();
@@ -327,7 +325,7 @@ impl Context {
 }
 
 impl Context {
-    fn string(&mut self, c: char) -> String {
+    pub fn string(&mut self, c: char) -> String {
         let mut s = String::new();
         for curr in self.cur_line
             .slice_from(self.cur_line_offset as usize)
@@ -406,9 +404,9 @@ fn test_the_sample_data_lines(c: &mut Context) {
 }
 
 impl Context {
-    fn open(path: Path) -> Result<Context, Error> {
+    pub fn open(path: Path) -> Result<Context, Error> {
         File::open(&path)
-            .map_err(|e| Error::CantOpenFile)
+            .map_err(|_| Error::CantOpenFile)
             .and_then(|f| {
                 let filename = format!("{}", path.filename_display());
                 let mut c = Context::raw_open(filename, f);
@@ -503,7 +501,7 @@ impl Context {
 /// io errors, which will be nonzero if at least one problem was
 /// noticed.
 impl Context {
-    fn close(mut self) -> Result<(), Error> {
+    pub fn close(mut self) -> Result<(), Error> {
         self.fill_buf();
         let expect = format!("* End of file \"{}\"",
                              self.filename);
@@ -532,7 +530,7 @@ impl Context {
 /// and gb raw close to provide system- independent input that is
 /// almost as foolproof as the reading of standard GraphBase data.
 impl Context {
-    fn raw_close(mut self) -> Long {
+    pub fn raw_close(mut self) -> Long {
         self.more_data = false;
         self.cur_line = String::new();
         self.cur_line_offset = 0;

@@ -5,16 +5,19 @@ use arena;
 
 use std::cell::Cell;
 use std::default::Default;
+use std::fmt;
 use std::mem;
 
-struct Context {
+#[derive(Copy)]
+pub struct Context {
     /// nonzero if "verbose" output is desired
-    verbose: u32,
+    pub verbose: u32,
     /// nonzero if graph generator returns null pointer (FIXME)
-    panic_code: u32,
+    pub panic_code: PanicCode,
 }
 
-enum PanicCode {
+#[derive(Copy)]
+pub enum PanicCode {
     /// A previous memory request failed
     AllocFault = -1,
     /// The current memory request failed
@@ -123,17 +126,17 @@ impl<'v> Default for Vertex<'v>  {
 /// from v in the list is represented by a⃗next.
 ///
 /// The utility fields are called a and b.
-struct Arc<'v>  {
+pub struct Arc<'v>  {
     /// the arc points to this vertex
-    tip: &'v Vertex<'v>,
+    pub tip: &'v Vertex<'v>,
     /// if non-null, another arc pointing from the same vertex
-    next: Option<&'v Arc<'v>>,
+    pub next: Option<&'v Arc<'v>>,
     /// length of this arc
-    len: Long,
+    pub len: Long,
     /// multipurpose field
-    a: Util<'v>,
+    pub a: Util<'v>,
     /// multipurpose field
-    b: Util<'v>,
+    pub b: Util<'v>,
 }
 
 pub struct Area {
@@ -141,6 +144,7 @@ pub struct Area {
 }
 
 impl Area {
+    pub fn new() -> Area { Default::default() }
     pub fn alloc<T, F>(&self, op: F) -> &mut T where F: FnOnce() -> T {
         self.arena.alloc(op)
     }
@@ -156,6 +160,7 @@ impl Default for Area {
 /// string), V (denoting a pointer to a Vertex), A (denoting a
 /// pointer to an Arc), G (denoting a pointer to a Graph), or Z
 /// (denoting an unused field that remains zero)
+#[derive(Copy)]
 #[repr(i8)]
 pub enum UtilType {
     I = 'I' as i8,
@@ -196,11 +201,11 @@ pub enum UtilType {
 /// ```
 pub struct Graph<'v>  {
     /// the vertex array
-    pub vertices: &'v [Vertex<'v>],
+    vertices: &'v [Vertex<'v>],
     /// total number of vertices
-    n: Long,
+    pub n: Long,
     /// total number of arcs
-    m: Long,
+    pub m: Long,
     /// GraphBase identification
     pub id: String,
     /// usage of utility fields
@@ -238,26 +243,26 @@ pub struct Graph<'v>  {
     /// GraphBase, but it might conceivably exist some day.)
     pub util_types: [UtilType; 14],
     /// the main data blocks
-    data: &'v Area,
+    pub data: &'v Area,
     /// subsidiary data blocks
-    aux_data: Area,
+    pub aux_data: Area,
     /// multipurpose field
-    uu: Util<'v>,
+    pub uu: Util<'v>,
     /// multipurpose field
-    vv: Util<'v>,
+    pub vv: Util<'v>,
     /// multipurpose field
-    ww: Util<'v>,
+    pub ww: Util<'v>,
     /// multipurpose field
-    xx: Util<'v>,
+    pub xx: Util<'v>,
     /// multipurpose field
-    yy: Util<'v>,
+    pub yy: Util<'v>,
     /// multipurpose field
-    zz: Util<'v>,
+    pub zz: Util<'v>,
 }
 
-const ID_FIELD_SIZE: Long = 161;
+pub const ID_FIELD_SIZE: Long = 161;
 
-const EXTRA_N: Long = 4;
+pub const EXTRA_N: Long = 4;
 
 impl<'v> Graph<'v>  {
     /// Some applications of bipartite graphs require all vertices of
@@ -266,7 +271,7 @@ impl<'v> Graph<'v>  {
     /// given the symbolic name n 1 , and it is set equal to the size
     /// of that first part. The size of the other part is then g⃗n − g⃗n
     /// 1 .
-    fn mark_bipartitle(&mut self, n1: Long) {
+    pub fn mark_bipartitle(&mut self, n1: Long) {
         self.uu = Util::I(n1);
         self.util_types[8] = I
     }
@@ -315,7 +320,7 @@ impl<'v> Graph<'v>  {
     /// The id field of a graph is sometimes manufactured from the id
     /// field of another graph. The following routines do this without
     /// allowing the string to get too long after repeated copying.
-    fn make_compound_id(&mut self, s1: &str, gg: &Graph, s2: &str) {
+    pub fn make_compound_id(&mut self, s1: &str, gg: &Graph, s2: &str) {
         let avail = idx(ID_FIELD_SIZE - long(s1.len()) - long(s2.len()));
         if gg.id.len() < avail {
             self.id = format!("{}{}{}", s1, gg.id, s2);
@@ -327,7 +332,7 @@ impl<'v> Graph<'v>  {
     /// The id field of a graph is sometimes manufactured from the id
     /// field of another graph. The following routines do this without
     /// allowing the string to get too long after repeated copying.
-    fn make_double_compound_id(&mut self, s1: &str,
+    pub fn make_double_compound_id(&mut self, s1: &str,
                                gg: &Graph, s2: &str,
                                ggg: &Graph, s3: &str) {
         let avail = idx(ID_FIELD_SIZE - long(s1.len()) - long(s2.len()) - long(s3.len()));
@@ -358,7 +363,8 @@ impl<'v> Graph<'v>  {
     /// in such cases; programs should make sure that
     /// |gb_trouble_code==0| before doing any extensive computation on
     /// a graph.
-    fn new_arc(&mut self, u: &Vertex<'v>, v: &'v Vertex<'v>, len: Long) {
+    pub fn new_arc(&mut self, u: &Vertex<'v>, v: &'v Vertex<'v>, len: Long) {
+        debug!("new_arc(u={}, v={}, len={})", u, v, len);
         let cur_arc : &Arc = self.data.arena.alloc(|| Arc {
             tip: v,
             next: u.arcs.get(),
@@ -403,7 +409,8 @@ impl<'v> Graph<'v>  {
     /// arc a from u to v will be arc a+1 if and only if u < v or
     /// a⃗next = a + 1; it will be arc a − 1 if and only if u ≥ v and
     /// a⃗next ̸= a + 1. The condition a⃗next =a+1 can hold only if u=v.
-    fn new_edge(&mut self, u: &'v Vertex<'v>, v: &'v Vertex<'v>, len: Long) {
+    pub fn new_edge(&mut self, u: &'v Vertex<'v>, v: &'v Vertex<'v>, len: Long) {
+        debug!("new_edge(u={}, v={}, len={})", u, v, len);
         let u_first = unsafe {
             mem::transmute::<_,usize>(&*u) < mem::transmute::<_,usize>(&*v)
         };
@@ -450,6 +457,37 @@ impl<'v> Graph<'v>  {
     }
 }
 
+impl<'v> fmt::String for Vertex<'v> {
+    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        write!(w, "{}", self.name.as_slice())
+    }
+}
+
+impl<'v> fmt::UpperExp for Graph<'v> {
+    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(w, "Graph {{ nodes: ["));
+        let mut saw_node = false;
+        for v in self.vertices.slice_to(idx(self.n)).iter() {
+            if saw_node { try!(write!(w, ", ")); }
+            try!(write!(w, "{}", v));
+            saw_node = true;
+        }
+
+        try!(write!(w, "], edges: ["));
+        let mut saw_edge = false;
+        for v in self.vertices.iter() {
+            let mut arc = &v.arcs.get();
+            while let &Some(a) = arc {
+                if saw_edge { try!(write!(w, ", ")); }
+                try!(write!(w, "{} -> {}", v, a.tip));
+                saw_edge = true;
+                arc = &a.next;
+            }
+        }
+        write!(w, "] }}")
+    }
+}
+
 #[test]
 fn main_test() {
     // <create a small graph>
@@ -486,11 +524,12 @@ fn main_test() {
     let (u, v) = g.vertices.split_at(1);
     let u = &u[0];
     let v = &v[0];
+    assert!(u.name != v.name);
 
     let vc = v.name.char_at(7) as i32;
     let vnc = v.arcs.get().unwrap().next.unwrap().tip.name.char_at(7) as i32;
     // '1' +   2 != '0' + 5 - 2
-    if (vc + g.n != vnc + g.m - 2) {
+    if vc + g.n != vnc + g.m - 2 {
         panic!("Sorry, the graph data structures aren't working yet. \
                 vc: {} g.n: {} vnc: {} g.m: {}", vc, g.n, vnc, g.m);
     }
