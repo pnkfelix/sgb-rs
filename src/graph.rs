@@ -180,6 +180,8 @@ pub enum UtilType {
     Z = 'Z' as i8,
 }
 
+pub type UtilTags = [UtilType; 14];
+
 /// Now we’re ready to look at the Graph type. This is a data
 /// structure that can be passed to an algorithm that operates on
 /// graphs—to find minimum spanning trees, or strong components, or
@@ -208,8 +210,9 @@ pub enum UtilType {
 ///     }
 /// }
 /// ```
-pub struct Graph<'v, Util=UtilFields<'v>, VertexUtil=UtilFields<'v>> where
-    Util:Default, VertexUtil:Default+'v {
+pub struct Graph<'v, Util=UtilFields<'v>, VertexUtil=UtilFields<'v>, UtilTag=UtilTags>
+    where Util:Default, VertexUtil:Default+'v
+{
     /// the vertex array
     vertices: &'v [Vertex<'v, VertexUtil>],
     /// total number of vertices
@@ -251,7 +254,8 @@ pub struct Graph<'v, Util=UtilFields<'v>, VertexUtil=UtilFields<'v>> where
     /// software that might rely on the conventions of util types
     /// . (Such software is not part of the “official” Stanford
     /// GraphBase, but it might conceivably exist some day.)
-    pub util_types: [UtilType; 14],
+    pub util_types: UtilTags,
+
     /// the main data blocks
     pub data: &'v Area,
     /// subsidiary data blocks
