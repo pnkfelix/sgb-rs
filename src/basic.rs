@@ -84,6 +84,53 @@ trait Classic {
 }
 
 impl Classic for Context {
+    fn board(&mut self, n1: Long, n2: Long, n3: Long, n4: Long,
+             piece: Long, wrap: Long, directed: Long) -> Graph {
+        Context::board(self, n1, n2, n3, n4, piece, wrap, directed)
+    }
+}
+
+impl Context {
+    fn normalize_the_board_size_parameters(
+        &mut self, mut n1: Long, mut n2: Long, mut n3: Long, mut n4: Long,
+        mut piece: Long) -> (Long, Long, Long, Long, Long, usize) {
+        let mut d: usize;
+        let &mut Context { ref mut nn, .. } = self;
+
+        // [Normalize the board size parameters 11]
+        enum E { Periodic(usize), Done }
+        if let E::Periodic(k) = {
+            let k: usize;
+            if piece == 0 { piece = 1; }
+            if n1 <= 0 { n1 = 8; n2 = 8; n3 = 0; }
+            nn[1] = n1;
+            let r = if n2 <= 0 {
+                k = 2; d = idx(-n2); n3 = 0; n4 = 0; E::Periodic(k)
+            } else {
+                nn[2] = n2;
+                if n3 <= 0 { k = 3; d = idx(-n3); n4 = 0; E::Periodic(k) }
+                else {
+                    nn[3] = n3;
+                    if n4 <= 0 { k = 4; d = idx(-n4); E::Periodic(k) }
+                    else { k = 0; nn[4] = n4; d = 4; E::Done }
+                }
+            };
+            if d == 0 { assert!(k > 0); d = k - 1; E::Done } else { r } }
+        {
+            // [Compute component sizes periodically for d dimensions 12]
+
+            // At this point, nn [1] through nn [k − 1] are the
+            // component sizes that should be replicated periodically.
+            //
+            // In unusual cases, the number of dimensions might not be
+            // as large as the number of specifications.
+            if idx(d) > MAX_D { panic!("bad_specs d: {}", d); }
+            for (j,k) in (k..idx(d+1)).enumerate() { nn[k] = nn[j+1] }
+        }
+
+        (n1, n2, n3, n4, piece, d)
+    }
+
     /// [Grids and game boards. The subroutine call]
     /// `board(n1,n2,n3,n4,piece,wrap,directed)` constructs a graph
     /// based on the moves of generalized chesspieces on a generalized
@@ -187,51 +234,23 @@ impl Classic for Context {
     /// get a circuit (undirected) or a cycle (directed) of length n,
     /// you can say `board(n,0,0,0,1,1,0)` and `board(n,0,0,0,1,1,1)`,
     /// respectively.
-    fn board(&mut self, mut n1: Long, mut n2: Long, mut n3: Long, mut n4: Long,
-             mut piece: Long, wrap: Long, directed: Long) -> Graph {
+    fn board(&mut self, n1: Long, n2: Long, n3: Long, n4: Long,
+             piece: Long, wrap: Long, directed: Long) -> Graph {
         let directed = directed != 0;
         let mut vertices;
         let mut new_graph: Graph; // the graph being constructed
         // all-purpose indices
         let mut j: Long; let mut k: usize;
-        let mut d: usize; // the number of dimensions
 
         let mut p: Long; // |piece|
+
+        // d is the number of dimensions
+        let (n1, n2, n3, n4, piece, d) =
+            self.normalize_the_board_size_parameters(n1, n2, n3, n4, piece);
 
         let &mut Context {
             ref area, ref mut nn, ref mut wr,
             ref mut del, ref mut sig, ref mut xx, ref mut yy, .. } = self;
-
-        // [Normalize the board size parameters 11]
-        enum E { Periodic(usize), Done }
-        if let E::Periodic(k) = {
-            let k: usize;
-            if piece == 0 { piece = 1; }
-            if n1 <= 0 { n1 = 8; n2 = 8; n3 = 0; }
-            nn[1] = n1;
-            let r = if n2 <= 0 {
-                k = 2; d = idx(-n2); n3 = 0; n4 = 0; E::Periodic(k)
-            } else {
-                nn[2] = n2;
-                if n3 <= 0 { k = 3; d = idx(-n3); n4 = 0; E::Periodic(k) }
-                else {
-                    nn[3] = n3;
-                    if n4 <= 0 { k = 4; d = idx(-n4); E::Periodic(k) }
-                    else { k = 0; nn[4] = n4; d = 4; E::Done }
-                }
-            };
-            if d == 0 { assert!(k > 0); d = k - 1; E::Done } else { r } }
-        {
-            // [Compute component sizes periodically for d dimensions 12]
-
-            // At this point, nn [1] through nn [k − 1] are the
-            // component sizes that should be replicated periodically.
-            //
-            // In unusual cases, the number of dimensions might not be
-            // as large as the number of specifications.
-            if idx(d) > MAX_D { panic!("bad_specs d: {}", d); }
-            for (j,k) in (k..idx(d+1)).enumerate() { nn[k] = nn[j+1] }
-        }
 
         // [Set up a graph with n vertices 13]
 
