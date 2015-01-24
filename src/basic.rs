@@ -12,6 +12,7 @@ use graph::UtilType::{Z,I};
 use std::default::Default;
 use std::fmt;
 use std::num::Int;
+use std::num::ToPrimitive;
 
 /// We limit the number of dimensions to 91 or less. This is hardly a
 /// limitation, since the number of vertices would be astronomical
@@ -92,9 +93,33 @@ impl Classic for Context {
     }
 }
 
-#[derive(Clone,Show)]
+#[derive(Copy,Clone,Show)]
 struct Repeating<I:Int>(I);
 impl<I:Int> Repeating<I> { fn len(&self) -> I { self.0 } }
+
+#[derive(Copy, Show)]
+enum Moves {
+    Once(u32),
+    Loop(u32),
+}
+
+trait Piece {
+    fn moves(&self) -> Moves;
+}
+
+impl Piece for Long {
+    fn moves(&self) -> Moves {
+        if *self < 0 {
+            Moves::Loop((-*self).to_u32().unwrap())
+        } else {
+            Moves::Once(self.to_u32().unwrap())
+        }
+    }
+}
+
+impl Piece for Moves {
+    fn moves(&self) -> Moves { *self }
+}
 
 pub trait BoardDescription {
     type Dims: BoardDimensions + fmt::Show;
