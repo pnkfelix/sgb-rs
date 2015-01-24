@@ -46,10 +46,12 @@ pub enum PanicCode {
 /// string, respectively; the suffix .I means that the variable is an
 /// integer. (We use one-character names because such names are easy
 /// to type when debugging.)
-pub enum Util<'v>  {
-    V(&'v Vertex<'v>),
-    A(&'v Arc<'v>),
-    G(&'v Graph<'v>),
+pub enum Util<'v,VF=UtilFields<'v>, AF=ArcUtilFields<'v>, GF=UtilFields<'v>>
+    where VF:Default+'v, AF:Default+'v, GF:Default+'v
+{
+    V(&'v Vertex<'v, VF>),
+    A(&'v Arc<'v, AF>),
+    G(&'v Graph<'v, GF>),
     S(&'v str),
     I(Long),
     Z,
@@ -106,6 +108,12 @@ pub struct UtilFields<'v> {
     pub z: Util<'v>,
 }
 
+#[derive(Default)]
+pub struct ArcUtilFields<'v> {
+    pub a: Util<'v>,
+    pub b: Util<'v>,
+}
+
 impl<'v> Default for Vertex<'v>  {
     fn default() -> Vertex<'v> {
         Vertex {
@@ -129,17 +137,15 @@ impl<'v> Default for Vertex<'v>  {
 /// from v in the list is represented by a⃗next.
 ///
 /// The utility fields are called a and b.
-pub struct Arc<'v>  {
+pub struct Arc<'v, AF=ArcUtilFields<'v>> where AF:Default+'v {
     /// the arc points to this vertex
     pub tip: &'v Vertex<'v>,
     /// if non-null, another arc pointing from the same vertex
     pub next: Option<&'v Arc<'v>>,
     /// length of this arc
     pub len: Long,
-    /// multipurpose field
-    pub a: Util<'v>,
-    /// multipurpose field
-    pub b: Util<'v>,
+    /// multipurpose fields
+    pub util: AF,
 }
 
 pub struct Area {
@@ -358,8 +364,7 @@ impl<'v> Graph<'v>  {
             tip: v,
             next: u.arcs.get(),
             len: len,
-            a: Default::default(),
-            b: Default::default(),
+            util: Default::default(),
         });
         u.arcs.set(Some(cur_arc));
         self.m += 1;
@@ -411,28 +416,24 @@ impl<'v> Graph<'v>  {
                 || (Arc { tip: v,
                           next: u_arcs_old,
                           len: len,
-                          a: Default::default(),
-                          b: Default::default(),
+                          util: Default::default(),
                 },
                     Arc { tip: u,
                           next: v_arcs_old,
                           len: len,
-                          a: Default::default(),
-                          b: Default::default(),
+                          util: Default::default(),
                     }))
         } else {
             self.data.arena.alloc(
                 || (Arc { tip: u,
                           next: v_arcs_old,
                           len: len,
-                          a: Default::default(),
-                          b: Default::default(),
+                          util: Default::default(),
                 },
                     Arc { tip: v,
                           next: u_arcs_old,
                           len: len,
-                          a: Default::default(),
-                          b: Default::default(),
+                          util: Default::default(),
                     }))
         };
         if u_first {
