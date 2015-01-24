@@ -10,6 +10,7 @@ use graph::{Area, Graph, Util};
 use graph::UtilType::{Z,I};
 
 use std::default::Default;
+use std::fmt;
 
 /// We limit the number of dimensions to 91 or less. This is hardly a
 /// limitation, since the number of vertices would be astronomical
@@ -90,11 +91,12 @@ impl Classic for Context {
     }
 }
 
+#[derive(Clone,Show)]
 struct Repeating(usize);
 impl Repeating { fn len(&self) -> usize { self.0 } }
 
 pub trait BoardDescription {
-    type Dims: BoardDimensions;
+    type Dims: BoardDimensions + fmt::Show;
     fn id(&self) -> String;
     fn piece(&self) -> Long;
     fn wrap(&self) -> Long;
@@ -135,7 +137,7 @@ impl BoardDescription for (Long, Long, Long, Long, Long, Long, bool) {
 }
 
 // dims; piece; wrap; directed
-impl<MyDims:BoardDimensions> BoardDescription for (MyDims, Long, Long, bool) {
+impl<MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, Long, Long, bool) {
     type Dims = MyDims;
     fn id(&self) -> String {
         let (ref dims, piece, wrap, directed) = *self;
@@ -146,12 +148,12 @@ impl<MyDims:BoardDimensions> BoardDescription for (MyDims, Long, Long, bool) {
     fn wrap(&self) -> Long { self.2 }
     fn directed(&self) -> bool { self.3 }
     fn dims(&self) -> MyDims {
-        self.dims()
+        self.0.clone()
     }
 }
 
 // dims; piece; wrap; directed
-impl<MyDims:BoardDimensions> BoardDescription for (MyDims, Long, Long, Long) {
+impl<MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, Long, Long, Long) {
     type Dims = MyDims;
     fn id(&self) -> String {
         let (ref dims, piece, wrap, directed) = *self;
@@ -163,7 +165,7 @@ impl<MyDims:BoardDimensions> BoardDescription for (MyDims, Long, Long, Long) {
     fn wrap(&self) -> Long { self.2 }
     fn directed(&self) -> bool { self.3 != 0 }
     fn dims(&self) -> MyDims {
-        self.dims()
+        self.0.clone()
     }
 }
 
@@ -177,6 +179,7 @@ pub trait BoardDimensions {
     fn partial_id(&self) -> String;
 }
 
+#[derive(Show)]
 enum DynamicBoardDimensions {
     Once1((Long,)),
     Once2((Long,Long)),
@@ -331,8 +334,9 @@ fn decode_the_board_size_parameters(
 
 impl Context {
 
-    fn normalize_the_board_size_parameters<BD:BoardDimensions>(
+    fn normalize_the_board_size_parameters<BD:BoardDimensions+fmt::Show>(
         &mut self, bd: BD, piece: Long) -> (Long, usize) {
+        debug!("normalize_the_board_size_parameters bd={:?}", bd);
 
         // [Normalize the board size parameters 11]
         // let dbd = decode_the_board_size_paramaeters(n1, n2, n3, n4);
@@ -342,6 +346,8 @@ impl Context {
             panic!("bad_specs d: {}", d);
         }
         bd.fill_dims(|dim, k| {
+            debug!("normalize_the_board_size_parameters dim={} k={}",
+                     dim, k);
             nn[k+1] = dim;
         });
 
@@ -693,9 +699,16 @@ fn board_tricky_spec() {
 }
 
 #[test]
+fn board_tricky_spec_decoded() {
+    let mut c = Context::new();
+    let b = c.board(((Repeating(7), 2,3,5), 1, 0, 0));
+    assert_eq!(b.vertices().len(), 1800);
+}
+
+#[test]
 fn board_2x2_wazir() {
     let mut c = Context::new();
-    let b = c.board((2,2,0,0, 1, 0, 0));
+    let b = c.board(((2,2), 1, 0, 0));
     println!("b: {:E}", b);
     // CC
     // CC, C = 2; C * 4 = 8
@@ -705,7 +718,7 @@ fn board_2x2_wazir() {
 #[test]
 fn board_3x3_wazir() {
     let mut c = Context::new();
-    let b = c.board((3,3,0,0, 1, 0, 0));
+    let b = c.board(((3,3), 1, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -716,7 +729,7 @@ fn board_3x3_wazir() {
 #[test]
 fn board_4x3_wazir() {
     let mut c = Context::new();
-    let b = c.board((4,3,0,0, 1, 0, 0));
+    let b = c.board(((4,3), 1, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // XMMX
@@ -727,7 +740,7 @@ fn board_4x3_wazir() {
 #[test]
 fn board_2x2_fers() {
     let mut c = Context::new();
-    let b = c.board((2,2,0,0, 2, 0, 0));
+    let b = c.board(((2,2), 2, 0, 0));
     println!("b: {:E}", b);
     // CC
     // CC, C = 1; C * 4 = 4
@@ -737,7 +750,7 @@ fn board_2x2_fers() {
 #[test]
 fn board_3x2_fers() {
     let mut c = Context::new();
-    let b = c.board((3,2,0,0, 2, 0, 0));
+    let b = c.board(((3,2), 2, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // CXC, C = 1, X = 2; C*4 + X*2  = 4 + 4 = 8
@@ -747,7 +760,7 @@ fn board_3x2_fers() {
 #[test]
 fn board_3x3_fers() {
     let mut c = Context::new();
-    let b = c.board((3,3,0,0, 2, 0, 0));
+    let b = c.board(((3,3), 2, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -758,7 +771,7 @@ fn board_3x3_fers() {
 #[test]
 fn board_4x3_fers() {
     let mut c = Context::new();
-    let b = c.board((4,3,0,0, 2, 0, 0));
+    let b = c.board(((4,3), 2, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // XMMX
@@ -769,7 +782,7 @@ fn board_4x3_fers() {
 #[test]
 fn board_3x3_knight() {
     let mut c = Context::new();
-    let b = c.board((3,3,0,0, 5, 0, 0));
+    let b = c.board(((3,3), 5, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -780,7 +793,7 @@ fn board_3x3_knight() {
 #[test]
 fn board_4x3_knight() {
     let mut c = Context::new();
-    let b = c.board((4,3,0,0, 5, 0, 0));
+    let b = c.board(((4,3), 5, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // SMMS
@@ -792,7 +805,7 @@ fn board_4x3_knight() {
 #[test]
 fn board_3x3x3_fers() {
     let mut c = Context::new();
-    let b = c.board((3,3,3,0, 3, 0, 0));
+    let b = c.board(((3,3,3), 3, 0, 0));
     println!("b: {:E}", b);
 
     //          CEC     (Z=2)
@@ -813,7 +826,7 @@ fn board_3x3x3_fers() {
 #[test]
 fn board_3x3_rook() {
     let mut c = Context::new();
-    let b = c.board((3,3,0,0, -1, 0, 0));
+    let b = c.board(((3,3), -1, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -824,7 +837,7 @@ fn board_3x3_rook() {
 #[test]
 fn board_3x3_bishop() {
     let mut c = Context::new();
-    let b = c.board((3,3,0,0, -2, 0, 0));
+    let b = c.board(((3,3), -2, 0, 0));
     println!("b: {:E}", b);
     // CXC
     // XMX
@@ -835,7 +848,7 @@ fn board_3x3_bishop() {
 #[test]
 fn board_4x3_bishop() {
     let mut c = Context::new();
-    let b = c.board((4,3,0,0, -2, 0, 0));
+    let b = c.board(((4,3), -2, 0, 0));
     println!("b: {:E}", b);
     // CXXC
     // SMMS
@@ -847,7 +860,7 @@ fn board_4x3_bishop() {
 #[test]
 fn board_5x4_nightrider() {
     let mut c = Context::new();
-    let b = c.board((5,4,0,0, -5, 0, 0));
+    let b = c.board(((5,4), -5, 0, 0));
     println!("b: {} {:E}", b.id, b);
 
     // A nightrider is a knight whose basic move can be repeated in
