@@ -4,6 +4,7 @@ use ::{Long, idx, long};
 use arena;
 
 use std::cell::Cell;
+use std::collections::HashMap;
 use std::default::Default;
 use std::fmt;
 use std::iter;
@@ -182,6 +183,34 @@ pub enum UtilType {
 
 pub type UtilTags = [UtilType; 14];
 
+pub trait VertexSet<'v> {
+    type VU:'v;
+    fn vertices(&self) -> &[Vertex<'v, Self::VU>];
+    fn len(&self) -> usize { self.vertices().len() }
+}
+
+impl<'v, VU:Default+'v> VertexSet<'v> for &'v [Vertex<'v, VU>] {
+    type VU=VU;
+    fn vertices(&self) -> &[Vertex<'v, VU>] { *self }
+}
+
+pub struct VertexTable<'v, VU:Default+'v> {
+    pub vertices: Vec<Vertex<'v, VU>>,
+    pub name_to_vertex: HashMap<&'v str, &'v Vertex<'v, VU>>,
+}
+
+impl<'v, VU:Default+'v> VertexSet<'v> for &'v mut VertexTable<'v, VU> {
+    type VU=VU;
+    fn vertices(&self) -> &[Vertex<'v, VU>] { &self.vertices[] }
+}
+
+impl<'v, VU:Default> VertexTable<'v, VU> {
+    pub fn new(vs: Vec<Vertex<'v, VU>>) -> VertexTable<'v, VU> {
+        VertexTable { vertices: vs, name_to_vertex: HashMap::new() }
+    }
+}
+
+
 /// Now we’re ready to look at the Graph type. This is a data
 /// structure that can be passed to an algorithm that operates on
 /// graphs—to find minimum spanning trees, or strong components, or
@@ -210,11 +239,12 @@ pub type UtilTags = [UtilType; 14];
 ///     }
 /// }
 /// ```
-pub struct Graph<'v, Util=UtilFields<'v>, VertexUtil=UtilFields<'v>, UtilTag=UtilTags>
-    where Util:Default, VertexUtil:Default+'v
+pub struct Graph<'v, Util=UtilFields<'v>, VertexUtil=UtilFields<'v>, UtilTag=UtilTags, VS=&'v [Vertex<'v, VertexUtil>]>
+    where VS: VertexSet<'v>, Util:Default, VertexUtil:Default+'v
 {
     /// the vertex array
-    vertices: &'v [Vertex<'v, VertexUtil>],
+    vertices: VS,
+
     /// total number of vertices
     pub n: Long,
     /// total number of arcs
@@ -299,7 +329,7 @@ impl<'v> Graph<'v>  {
         vertices
     }
 
-    pub fn new_graph(vertices: &'v [Vertex<'v>], data: &'v Area) -> Graph<'v> {
+    pub fn new_graph<VS:'v+VertexSet<'v>>(vertices: VS, data: &'v Area) -> Graph<'v,UtilFields<'v>,UtilFields<'v>,UtilTags,VS> {
         let n = long(vertices.len()) - EXTRA_N;
         Graph {
             vertices: vertices,
@@ -453,7 +483,7 @@ impl<'v> Graph<'v>  {
 
 impl<'v> Graph<'v> {
     pub fn vertices(&self) -> &'v [Vertex<'v>] {
-        self.vertices.slice_to(self.n as usize)
+        &self.vertices[..(self.n as usize)]
     }
     pub fn edges(&self) -> EdgeIterator<'v> {
         let vertices = &self.vertices;
@@ -462,6 +492,21 @@ impl<'v> Graph<'v> {
             curr_ver: 0,
             next_ver: 0,
             next_arc: None,
+        }
+    }
+}
+
+impl<'v, VU:Default> VertexTable<'v, VU> where Vertex<'v, VU> : fmt::Display {
+    pub fn hash_in(&mut self, vertex: &'v Vertex<'v, VU>) {
+        match self.name_to_vertex.insert(&vertex.name[], vertex) {
+            None => {}
+            Some(old) => {
+                if (old as *const _ != vertex as *const _) {
+                    panic!("hashed two distinct vertices with the same name; \
+                            name={} old={} new={}",
+                           vertex.name, old, vertex)
+                }
+            }
         }
     }
 }
@@ -498,7 +543,7 @@ impl<'v> iter::Iterator for EdgeIterator<'v> {
     }
 }
 
-impl<'v> fmt::String for Vertex<'v> {
+impl<'v> fmt::Display for Vertex<'v> {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         write!(w, "{}", self.name.as_slice())
     }
@@ -508,7 +553,7 @@ impl<'v> fmt::UpperExp for Graph<'v> {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         try!(write!(w, "Graph {{ nodes: ["));
         let mut saw_node = false;
-        for v in self.vertices.slice_to(idx(self.n)).iter() {
+        for v in self.vertices[..idx(self.n)].iter() {
             if saw_node { try!(write!(w, ", ")); }
             try!(write!(w, "{}", v));
             saw_node = true;
