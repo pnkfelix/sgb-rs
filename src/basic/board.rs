@@ -324,7 +324,7 @@ fn decode_the_board_size_parameters(
 
 pub fn board<BD:BoardDescription>(c: &mut Context, bd: BD) -> Graph {
     let piece = bd.piece();
-    println!("board piece={:?}", piece);
+    debug!("board piece={:?}", piece);
     let wrap = bd.wrap();
     let directed = bd.directed();
 
@@ -590,7 +590,7 @@ fn board_tricky_spec_decoded() {
 fn board_2x2_wazir() {
     let mut c = Context::new();
     let b = c.board(((2,2), WAZIR, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CC
     // CC, C = 2; C * 4 = 8
     assert_eq!(b.edges().count(), 8);
@@ -600,7 +600,7 @@ fn board_2x2_wazir() {
 fn board_3x3_wazir() {
     let mut c = Context::new();
     let b = c.board(((3,3), WAZIR, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CXC
     // XMX
     // CXC, C = 2, M = 4, X = 3; C*4 + X*4 + M = 8 + 12 + 3 = 24
@@ -611,7 +611,7 @@ fn board_3x3_wazir() {
 fn board_4x3_wazir() {
     let mut c = Context::new();
     let b = c.board(((4,3), WAZIR, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CXXC
     // XMMX
     // CXXC, C = 2, M = 4, X = 3; C*4 + X*6 + M*2 = 8 + 18 + 8 = 34
@@ -622,7 +622,7 @@ fn board_4x3_wazir() {
 fn board_2x2_fers() {
     let mut c = Context::new();
     let b = c.board(((2,2), FERS, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CC
     // CC, C = 1; C * 4 = 4
     assert_eq!(b.edges().count(), 4);
@@ -632,7 +632,7 @@ fn board_2x2_fers() {
 fn board_3x2_fers() {
     let mut c = Context::new();
     let b = c.board(((3,2), FERS, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CXC
     // CXC, C = 1, X = 2; C*4 + X*2  = 4 + 4 = 8
     assert_eq!(b.edges().count(), 8);
@@ -642,7 +642,7 @@ fn board_3x2_fers() {
 fn board_3x3_fers() {
     let mut c = Context::new();
     let b = c.board(((3,3), FERS, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CXC
     // XMX
     // CXC, C = 1, M = 4, X = 2; C*4 + X*4 + M = 4 + 8 + 4 = 16
@@ -653,7 +653,7 @@ fn board_3x3_fers() {
 fn board_4x3_fers() {
     let mut c = Context::new();
     let b = c.board(((4,3), FERS, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CXXC
     // XMMX
     // CXXC, C = 1, M = 4, X = 2; C*4 + X*6 + M*2 = 4 + 12 + 8 = 24
@@ -664,7 +664,7 @@ fn board_4x3_fers() {
 fn board_3x3_knight() {
     let mut c = Context::new();
     let b = c.board(((3,3), KNIGHT, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CXC
     // XMX
     // CXC, C = 2, X = 2, M = 0; C*4 + X*4 + M*1 = 8 + 8 + 0 = 16
@@ -675,7 +675,7 @@ fn board_3x3_knight() {
 fn board_4x3_knight() {
     let mut c = Context::new();
     let b = c.board(((4,3), KNIGHT, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CXXC
     // SMMS
     // CXXC, C = 2, S = 2, X = 3, M = 2;
@@ -694,7 +694,7 @@ fn board_3x3x3_fers_3d() {
     // value to be 3.
 
     let b = c.board(((3,3,3), 3, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
 
     //          CEC     (Z=2)
     //          ESE
@@ -715,7 +715,7 @@ fn board_3x3x3_fers_3d() {
 fn board_3x3_rook() {
     let mut c = Context::new();
     let b = c.board(((3,3), ROOK, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CXC
     // XMX
     // CXC, C = 4, X = 4, M = 4; C*4 + X*4 + M*1 = 16 + 16 + 4 = 36
@@ -726,7 +726,7 @@ fn board_3x3_rook() {
 fn board_3x3_bishop() {
     let mut c = Context::new();
     let b = c.board(((3,3), BISHOP, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CXC
     // XMX
     // CXC, C = 2, X = 2, M = 4; C*4 + X*4 + M*1 = 8 + 8 + 4 = 20
@@ -737,7 +737,7 @@ fn board_3x3_bishop() {
 fn board_4x3_bishop() {
     let mut c = Context::new();
     let b = c.board(((4,3), BISHOP, 0, 0));
-    println!("b: {:E}", b);
+    debug!("b: {:E}", b);
     // CXXC
     // SMMS
     // CXXC, C = 2, S = 2, X = 3, M = 4;
@@ -749,7 +749,7 @@ fn board_4x3_bishop() {
 fn board_5x4_nightrider() {
     let mut c = Context::new();
     let b = c.board(((5,4), NIGHTRIDER, 0, 0));
-    println!("b: {} {:E}", b.id, b);
+    debug!("b: {} {:E}", b.id, b);
 
     // A nightrider is a knight whose basic move can be repeated in
     // the *same* direction.
