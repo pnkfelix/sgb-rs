@@ -197,6 +197,80 @@ impl Context {
     pub fn board<BD: board::BoardDescription>(&mut self, bd: BD) -> Graph {
         board::board(self, bd)
     }
+
+    /// @* Generalized triangular boards. The subroutine call
+    /// |simplex(n,n0,n1,n2,n3,n4,directed)| creates a graph based on
+    /// generalized triangular or tetrahedral configurations. Such graphs are
+    /// similar in spirit to the game boards created by |board|, but they
+    /// pertain to nonrectangular grids like those in Chinese checkers. As
+    /// with |board| in the case |piece=1|, the vertices represent board positions
+    /// and the arcs run from board positions to their nearest neighbors. Each arc has
+    /// length~1.{\tolerance=1000\par}
+    ///
+    /// More formally, the vertices can be defined as sequences of nonnegative
+    /// integers $(x_0,x_1,\ldots,x_d)$ whose sum is~|n|, where two sequences
+    /// are considered adjacent if and only if they differ by $\pm1$ in exactly
+    /// two components---equivalently, if the Euclidean distance between them
+    /// is~$\sqrt2$. When $d=2$, for example, the vertices can be visualized
+    /// as a triangular array
+    /// $$\vcenter{\halign{&\hbox to 2em{\hss$#$\hss}\cr
+    /// &&&(0,0,3)\cr
+    /// &&(0,1,2)&&(1,0,2)\cr
+    /// &(0,2,1)&&(1,1,1)&&(2,0,1)\cr
+    /// (0,3,0)&&(1,2,0)&&(2,1,0)&&(3,0,0)\cr}}$$
+    /// containing $(n+1)(n+2)/2$ elements, illustrated here when $n=3$; each vertex of
+    /// the array has up to 6 neighbors. When $d=3$ the vertices form a tetrahedral
+    /// array, a stack of triangular layers, and they can have as many as 12
+    /// neighbors. In general, a vertex in a $d$-simplicial array will have up to
+    /// $d(d+1)$ neighbors.
+    ///
+    /// If the |directed| parameter is nonzero, arcs run only from vertices to
+    /// neighbors that are lexicographically greater---for example, downward
+    /// or to the right in the triangular array shown. The directed graph is
+    /// therefore acyclic, and a vertex of a $d$-simplicial array has
+    /// out-degree at most $d(d+1)/2$.
+    ///
+    /// @ The first parameter, |n|, specifies the sum of the coordinates
+    /// $(x_0,x_1,\ldots,x_d)$. The following parameters |n0| through |n4|
+    /// specify upper bounds on those coordinates, and they also specify the
+    /// dimensionality~|d|.
+    ///
+    /// If, for example, |n0|, |n1|, and |n2| are positive while |n3=0|, the
+    /// value of~|d| will be~2 and the coordinates will be constrained to
+    /// satisfy $0\le x_0\le|n0|$, $0\le x_1\le|n1|$, $0\le x_2\le|n2|$. These
+    /// upper bounds essentially lop off the corners of the triangular array.
+    /// We obtain a hexagonal board with $6m$ boundary cells by asking for
+    /// |simplex(3m,2m,2m,2m,0,0,0)|. We obtain the diamond-shaped board used
+    /// in the game of Hex [Martin Gardner, {\sl The Scientific American
+    /// @^Gardner, Martin@>
+    /// Book of Mathematical Puzzles {\char`\&} Diversions\/} (Simon {\char`\&}
+    /// Schuster, 1959), Chapter~8] by calling |simplex(20,10,20,10,0,0,0)|.
+    ///
+    /// In general, |simplex| determines |d| and upper bounds $(n_0,n_1,\ldots,n_d)$
+    /// in the following way: Let the first nonpositive entry of the sequence
+    /// |(n0,n1,n2,n3,n4,0)|$\null=(n_0,n_1,n_2,n_3,n_4,0)$ be~$n_k$. If $k>0$
+    /// and $n_k=0$, the value of~$d$ will be $k-1$ and the coordinates will be
+    /// bounded by the given numbers $(n_0,\ldots,n_d)$. If $k>0$ and $n_k<0$,
+    /// the value of~$d$ will be $\vert n_k\vert$ and the coordinates will be
+    /// bounded by the first $d+1$ elements of the infinite periodic sequence
+    /// $(n_0,\ldots,n_{k-1},n_0,\ldots,n_{k-1},n_0,\ldots\,)$. If $k=0$ and
+    /// $n_0<0$, the value of~$d$ will be $\vert n_0\vert$ and the coordinates
+    /// will be unbounded; equivalently, we may set $n_0=\cdots=n_d=n$. In
+    /// this case the number of vertices will be $n+d\choose d$. Finally,
+    /// if $k=0$ and $n_0=0$, we have the default case of a triangular array
+    /// with $3n$ boundary cells, exactly as if $n_0=-2$.
+    ///
+    /// For example, the specification |n0=3|, |n1=-5| will produce all vertices
+    /// $(x_0,x_1,\ldots,x_5)$ such that $x_0+x_1+\cdots+x_5=n$ and $0\le x_j\le3$.
+    /// The specification |n0=1|, |n1=-d| will essentially produce all $n$-element
+    /// subsets of the $(d+1)$-element set $\{0,1,\ldots,d\}$, because we can
+    /// regard an element~$k$ as being present in the set if $x_k=1$ and absent
+    /// if $x_k=0$. In that case two subsets are adjacent if and only if
+    /// they have exactly $n-1$ elements in common. 
+    pub fn simplex<SD:simplex::SimplexDescription>(&mut self, sd: SD) -> Graph {
+        simplex::simplex(self, sd)
+    }
 }
 
 pub mod board;
+pub mod simplex;

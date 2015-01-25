@@ -1,8 +1,7 @@
-use ::{Long, idx, long};
-use ::graph::{Graph, Util};
-use ::graph::UtilType::{Z,I};
-
+use {Long, idx, long};
 use basic::{Context, MAX_D};
+use graph::{Graph, Util};
+use graph::UtilType::{Z,I};
 
 use std::fmt;
 use std::num::Int;
