@@ -1,9 +1,10 @@
-use {ULong,Long,idx,long};
+use {ULong,Long,idx,long,ulong};
 use basic::{Context, Repeating};
-use graph::{Graph};
+use graph::{self, Graph, Util, VertexTable};
 use graph::UtilType::{V,Z,I};
 
 use std::fmt;
+use std::iter;
 
 pub trait BoardDimensions {
     // The dimensionality of the board (d); note that this implies d+1
@@ -44,6 +45,7 @@ impl SimplexDescription for (ULong, Long, Long, Long, Long, Long, Long) {
     }
 }
 
+#[allow(dead_code)]
 struct SumCoords(ULong);
 
 fn decode_the_simplex_size_parameters(
@@ -261,8 +263,10 @@ impl BoardDimensions for DynamicSimplexDimensions {
 // (see documentation for `Context::simplex`)
 pub fn simplex<SD:SimplexDescription>(c: &mut Context, sd: SD) -> Graph {
     // [Normalize the simplex parameters 27]
-    let nn = &mut c.nn;
+    let &mut Context {
+        ref area, ref mut nn, ref mut sig, ref mut xx, ref mut yy, .. } = c;
     let dims = sd.dims();
+    let n = sd.sum_of_coords();
     let d = dims.num_dims();
     dims.fill_bounds(|part, k| {
         nn[k] = part;
@@ -277,12 +281,149 @@ pub fn simplex<SD:SimplexDescription>(c: &mut Context, sd: SD) -> Graph {
     // coefficient of~$z^n$ in the power series
     // $$(1+z+\cdots+z^{n_0})(1+z+\cdots+z^{n_1})\ldots(1+z+\cdots+z^{n_d}).$$
 
+    let vertices = {
+        let nverts;
+        let mut coef : Vec<Long> = iter::repeat(0).take(idx(n+1)).collect();
+        for k in 0..nn[0]+1 {
+            coef[idx(k)] = 1;
+        }
+        // now coef reperesens the coefficients of 1 + z + ... + z^{n_0}
+        for j in 1..d+1 {
+            // [Multiply the power series coefficients
+            //  by 1 + z + ... + z^{n_j} 30]
+
+            // @ There's a neat way to multiply by
+            // $1+z+\cdots+z^{n_j}$: We multiply first by
+            // $1-z^{n_j+1}$, then sum the coefficients.
+            // 
+            // We want to detect impossibly large specifications
+            // without risking integer overflow. It is easy to do this
+            // because multiplication is being done via addition.
+
+            assert!(nn[j] < n as Long);
+            for (i,k) in (0..(n - ulong(nn[j]))).zip(0..n).rev() {
+                coef[idx(k)] -= coef[idx(i)];
+            }
+            let mut s = 1;
+            for k in 1..n+1 {
+                s += coef[idx(k)];
+                if s > 1_000_000_000 {
+                    panic!("very_bad_specs s={} coef={:?}", s, coef);
+                }
+                coef[idx(k)] = s;
+            }
+        }
+        nverts = coef[idx(n)];
+        Graph::new_vertices(nverts)
+    };
+
     let new_graph_id = sd.id();
 
     // hash table will be used
     let new_graph_util_types = [V,V,Z,I,I,I,Z,Z,Z,Z,Z,Z,Z,Z];
-    unimplemented!();
 
     // [Name the points and create the arcs or edges 31]
+
+    // @ As we generate the vertices, it proves convenient to
+    // precompute an array containing the numbers
+    // $y_j=n_j+\cdots+n_d$, which represent the largest possible sums
+    // $x_j+\cdots+x_d$. We also want to maintain the numbers
+    // $\sigma_j=n-(x_0+\cdots+x_{j-1})=x_j+\cdots+x_d$. The
+    // conditions
+    //
+    // $$0\le x_j\le n_j, \qquad \sigma_j-y_{j+1}\le x_j\le \sigma_j$$
+    //
+    // are necessary and sufficient, in the sense that we can find at
+    // least one way to complete a partial solution $(x_0,\ldots,x_k)$
+    // to a full solution $(x_0,\ldots,x_d)$ if and only if the
+    // conditions hold for all $j\le k$.
+    // 
+    // There is at least one solution if and only if $n\le y_0$.
+    // 
+    // We enter the name string into a hash table, using the |hash_in|
+    // routine of {\sc GB\_\,GRAPH}, because there is no simple way to
+    // compute the location of a vertex from its coordinates.
+
+    let mut vertices_table = VertexTable::new(vertices);
+
+    yy[d+1] = 0;
+    sig[0] = long(n);
+    for k in (0..d+1).rev() { yy[k] = yy[k+1] + nn[k]; }
+    if yy[0] >= long(n) {
+        let mut k = 0;
+        xx[0] = if yy[1] >= long(n) { 0 } else { long(n) - yy[1] };
+
+        let &mut VertexTable {
+            ref mut vertices, ref mut name_to_vertex } = &mut vertices_table;
+
+        let mut vertices_iter = vertices.iter_mut();
+        let mut cursor = vertices_iter.next();
+        'find_partials: loop {
+            let v = cursor.unwrap();
+            // [Complete the partial solution (x_0,...,x_k) 32]
+            let mut s = sig[k] - xx[k];
+            k += 1;
+            while k <= d {
+                sig[k] = s;
+                xx[k] = if s <= yy[k+1] { 0 } else { s - yy[k+1] };
+                s -= xx[k]; k += 1;
+            }
+            assert_eq!(s, 0);
+
+            // [Assign a symbolic name for (x_0,...,x_d) to vertex v 34]
+
+            // @ As in the |board| routine, we represent the sequence
+            // of coordinates $(2,0,1)$ by the string `"2.0.1"`.  The
+            // string won't exceed |BUF_SIZE|, because the ratio
+            // |BUF_SIZE/MAX_D| is plenty big.
+            // 
+            // The first three coordinate values, $(x_0,x_1,x_2)$, are
+            // placed into utility fields |x|, |y|, and |z|, so that
+            // they can be accessed immediately if an application
+            // needs them.
+
+            let mut p = String::new();
+            for k in 0..d+1 {
+                p.push_str(format!(".{}", xx[k]).as_slice());
+            }
+            v.name = p.chars().skip(1).collect(); // omit char 0, which is '.'
+            v.util.x = Util::I(xx[0]);
+            v.util.y = Util::I(xx[1]);
+            v.util.z = Util::I(xx[2]);
+
+            name_to_vertex.insert(&v.name[], v); // enter v.name into hash table (via utility fields u,v)
+
+            // [Create arcs or edges from previous points to v 35]
+
+            unimplemented!();
+
+            cursor = vertices_iter.next();
+
+            // [Advance to the next partial solution (x_0,...,x_k),
+            //  where k is as large as possible; break if there are no
+            //  more solutions 33]
+
+            // @ Here we seek the largest $k$ such that $x_k$ can be
+            // increased without violating the necessary and
+            // sufficient conditions stated earlier.
+
+            for k in (0..d).rev() {
+                if xx[k] < sig[k] && xx[k] < nn[k] {
+                    break;
+                }
+                if k == 0 {
+                    break 'find_partials;
+                }
+            }
+            xx[k] += 1;
+        }
+    }
+
     unimplemented!();
+
+    let vertices = area.alloc(move |:| vertices_table);
+
+    let new_graph = Graph::new_graph(vertices, area);
+
+
 }
