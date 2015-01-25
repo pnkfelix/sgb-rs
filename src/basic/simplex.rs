@@ -1,6 +1,6 @@
 use {ULong,Long,idx,long,ulong};
 use basic::{Context, Repeating};
-use graph::{self, Graph, Util, VertexTable};
+use graph::{Graph, Util};
 use graph::UtilType::{V,Z,I};
 
 use std::fmt;
@@ -264,7 +264,8 @@ impl BoardDimensions for DynamicSimplexDimensions {
 pub fn simplex<SD:SimplexDescription>(c: &mut Context, sd: SD) -> Graph {
     // [Normalize the simplex parameters 27]
     let &mut Context {
-        ref area, ref mut nn, ref mut sig, ref mut xx, ref mut yy, .. } = c;
+        ref area, ref mut nn, ref mut sig,
+        ref mut xx, ref mut yy, .. } = c;
     let dims = sd.dims();
     let n = sd.sum_of_coords();
     let d = dims.num_dims();
@@ -281,7 +282,7 @@ pub fn simplex<SD:SimplexDescription>(c: &mut Context, sd: SD) -> Graph {
     // coefficient of~$z^n$ in the power series
     // $$(1+z+\cdots+z^{n_0})(1+z+\cdots+z^{n_1})\ldots(1+z+\cdots+z^{n_d}).$$
 
-    let vertices = {
+    let mut vertices = {
         let nverts;
         let mut coef : Vec<Long> = iter::repeat(0).take(idx(n+1)).collect();
         for k in 0..nn[0]+1 {
@@ -300,7 +301,7 @@ pub fn simplex<SD:SimplexDescription>(c: &mut Context, sd: SD) -> Graph {
             // without risking integer overflow. It is easy to do this
             // because multiplication is being done via addition.
 
-            assert!(nn[j] < n as Long);
+            assert!(nn[j] <= n as Long, "nn[j]={} n={} nn={:?}", nn[j], n, &nn[]);
             for (i,k) in (0..(n - ulong(nn[j]))).zip(0..n).rev() {
                 coef[idx(k)] -= coef[idx(i)];
             }
@@ -321,6 +322,8 @@ pub fn simplex<SD:SimplexDescription>(c: &mut Context, sd: SD) -> Graph {
 
     // hash table will be used
     let new_graph_util_types = [V,V,Z,I,I,I,Z,Z,Z,Z,Z,Z,Z,Z];
+
+    let mut new_graph;
 
     // [Name the points and create the arcs or edges 31]
 
@@ -344,8 +347,6 @@ pub fn simplex<SD:SimplexDescription>(c: &mut Context, sd: SD) -> Graph {
     // routine of {\sc GB\_\,GRAPH}, because there is no simple way to
     // compute the location of a vertex from its coordinates.
 
-    let mut vertices_table = VertexTable::new(vertices);
-
     yy[d+1] = 0;
     sig[0] = long(n);
     for k in (0..d+1).rev() { yy[k] = yy[k+1] + nn[k]; }
@@ -353,15 +354,11 @@ pub fn simplex<SD:SimplexDescription>(c: &mut Context, sd: SD) -> Graph {
         let mut k = 0;
         xx[0] = if yy[1] >= long(n) { 0 } else { long(n) - yy[1] };
 
-        let &mut VertexTable {
-            ref mut vertices, ref mut name_to_vertex } = &mut vertices_table;
-
-        let mut vertices_iter = vertices.iter_mut();
-        let mut cursor = vertices_iter.next();
-        'find_partials: loop {
-            let v = cursor.unwrap();
+        'find_partials: for (v_i, v) in vertices.iter_mut().enumerate() {
             // [Complete the partial solution (x_0,...,x_k) 32]
             let mut s = sig[k] - xx[k];
+            debug!("initializing vertex_{}, s={} k={} sig={:?} xx={:?}",
+                   v_i, s, k, &sig[], &xx[]);
             k += 1;
             while k <= d {
                 sig[k] = s;
@@ -391,13 +388,77 @@ pub fn simplex<SD:SimplexDescription>(c: &mut Context, sd: SD) -> Graph {
             v.util.y = Util::I(xx[1]);
             v.util.z = Util::I(xx[2]);
 
-            name_to_vertex.insert(&v.name[], v); // enter v.name into hash table (via utility fields u,v)
+            // [Advance to the next partial solution (x_0,...,x_k),
+            //  where k is as large as possible; break if there are no
+            //  more solutions 33]
+
+            // @ Here we seek the largest $k$ such that $x_k$ can be
+            // increased without violating the necessary and
+            // sufficient conditions stated earlier.
+
+            for k_ in (0..d).rev() {
+                k = k_;
+                if xx[k_] < sig[k_] && xx[k_] < nn[k_] {
+                    break;
+                }
+                if k_ == 0 {
+                    break 'find_partials;
+                }
+            }
+            xx[k] += 1;
+        }
+
+        let vertices = area.alloc(move |:| vertices);
+
+        new_graph = Graph::new_graph(&vertices[], area);
+        new_graph.id = new_graph_id;
+        new_graph.util_types = new_graph_util_types;
+
+        for v in new_graph.vertices().iter() {
+            new_graph.name_to_vertex.insert(&v.name[], v); // enter v.name into hash table (via utility fields u,v)
+        }
+
+        k = 0;
+        xx[0] = if yy[1] >= long(n) { 0 } else { long(n) - yy[1] };
+
+        'find_partials: for (v_i, v) in new_graph.vertices().iter().enumerate() {
+            // [Complete the partial solution (x_0,...,x_k) 32]
+            let mut s = sig[k] - xx[k];
+            debug!("Finding {} for vertex_{}, s={} k={} sig={:?} xx={:?}",
+                   if sd.directed() { "arcs" } else { "edges" },
+                   v_i, s, k, &sig[], &xx[]);
+            k += 1;
+            while k <= d {
+                sig[k] = s;
+                xx[k] = if s <= yy[k+1] { 0 } else { s - yy[k+1] };
+                s -= xx[k]; k += 1;
+            }
+            assert_eq!(s, 0);
 
             // [Create arcs or edges from previous points to v 35]
 
-            unimplemented!();
-
-            cursor = vertices_iter.next();
+            for j in (0..d) {
+                if xx[j] != 0 {
+                    xx[j] -= 1;
+                    for k in j+1..d+1 {
+                        if xx[k] < nn[k] {
+                            let mut p = String::new();
+                            xx[k] += 1;
+                            for i in 0..d+1 {
+                                p.push_str(format!(".{}", xx[i]).as_slice());
+                            }
+                            let u = new_graph.name_to_vertex[p[1..p.len()]];
+                            if sd.directed() {
+                                new_graph.new_arc(u, v, 1);
+                            } else {
+                                new_graph.new_edge(u, v, 1);
+                            }
+                            xx[k] -= 1;
+                        }
+                    }
+                    xx[j] += 1;
+                }
+            }
 
             // [Advance to the next partial solution (x_0,...,x_k),
             //  where k is as large as possible; break if there are no
@@ -407,23 +468,32 @@ pub fn simplex<SD:SimplexDescription>(c: &mut Context, sd: SD) -> Graph {
             // increased without violating the necessary and
             // sufficient conditions stated earlier.
 
-            for k in (0..d).rev() {
-                if xx[k] < sig[k] && xx[k] < nn[k] {
+            for k_ in (0..d).rev() {
+                k = k_;
+                if xx[k_] < sig[k_] && xx[k_] < nn[k_] {
                     break;
                 }
-                if k == 0 {
+                if k_ == 0 {
                     break 'find_partials;
                 }
             }
             xx[k] += 1;
         }
+        return new_graph;
     }
 
-    unimplemented!();
+    let vertices = area.alloc(move |:| vertices);
+    new_graph = Graph::new_graph(&vertices[], area);
+    new_graph.id = new_graph_id;
+    new_graph.util_types = new_graph_util_types;
+    new_graph
+}
 
-    let vertices = area.alloc(move |:| vertices_table);
-
-    let new_graph = Graph::new_graph(vertices, area);
-
-
+#[test]
+fn d2_2d_triangular() {
+    let mut c = Context::new();
+    let s = c.simplex((3, 3, 3, 3, 0, 0, 0));
+    println!("s: {:E}", s);
+    assert_eq!(s.vertices().iter().count(), (4 * 5)/2);
+    panic!("fake");
 }

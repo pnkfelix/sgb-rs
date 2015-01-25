@@ -243,7 +243,9 @@ pub struct Graph<'v, Util=UtilFields<'v>, VertexUtil=UtilFields<'v>, UtilTag=Uti
     where VS: VertexSet<'v>, Util:Default, VertexUtil:Default+'v
 {
     /// the vertex array
-    vertices: VS,
+    vertices: &'v [Vertex<'v, VertexUtil>],
+
+    pub name_to_vertex: HashMap<&'v str, &'v Vertex<'v, VertexUtil>>,
 
     /// total number of vertices
     pub n: Long,
@@ -329,10 +331,11 @@ impl<'v> Graph<'v>  {
         vertices
     }
 
-    pub fn new_graph<VS:'v+VertexSet<'v>>(vertices: VS, data: &'v Area) -> Graph<'v,UtilFields<'v>,UtilFields<'v>,UtilTags,VS> {
+    pub fn new_graph(vertices: &'v [Vertex<'v>], data: &'v Area) -> Graph<'v,UtilFields<'v>,UtilFields<'v>,UtilTags> {
         let n = long(vertices.len()) - EXTRA_N;
         Graph {
             vertices: vertices,
+            name_to_vertex: HashMap::new(),
             n: n,
             m: 0,
             id: format!("gb_new_graph({})", n),
@@ -501,7 +504,7 @@ impl<'v, VU:Default> VertexTable<'v, VU> where Vertex<'v, VU> : fmt::Display {
         match self.name_to_vertex.insert(&vertex.name[], vertex) {
             None => {}
             Some(old) => {
-                if (old as *const _ != vertex as *const _) {
+                if old as *const _ != vertex as *const _ {
                     panic!("hashed two distinct vertices with the same name; \
                             name={} old={} new={}",
                            vertex.name, old, vertex)
