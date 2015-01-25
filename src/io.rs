@@ -328,9 +328,7 @@ impl Context {
 impl Context {
     pub fn string(&mut self, c: char) -> String {
         let mut s = String::new();
-        for curr in self.cur_line
-            .slice_from(self.cur_line_offset as usize)
-            .chars() {
+        for curr in self.cur_line[(self.cur_line_offset as usize)..].chars() {
             if curr == c {
                 break;
             }
@@ -446,7 +444,7 @@ impl Context {
 impl Context {
     fn check_first_line(&mut self) -> Result<(), Error> {
         let expect = format!("* File \"{}\"", self.filename);
-        if self.cur_line.slice_to(expect.len()) != expect {
+        if &self.cur_line[..expect.len()] != expect {
             return Err(Error::BadFirstLine);
         }
         Ok(())
@@ -472,7 +470,7 @@ impl Context {
         self.fill_buf();
         let expect = "* (Checksum parameters ";
         {
-            let actual = self.cur_line.slice_to(expect.len());
+            let actual = &self.cur_line[..expect.len()];
             if actual != expect {
                 println!("whoops 1, actual: {}", actual);
                 return Err(Error::BadFourthLine);
@@ -506,7 +504,7 @@ impl Context {
         self.fill_buf();
         let expect = format!("* End of file \"{}\"",
                              self.filename);
-        if self.cur_line.slice_to(expect.len()) != expect {
+        if &self.cur_line[..expect.len()] != expect {
             return Err(Error::BadLastLine)
         }
         self.more_data = false;
