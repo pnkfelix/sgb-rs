@@ -519,253 +519,253 @@ impl Context {
 }
 
 fn board<BD:BoardDescription>(c: &mut Context, bd: BD) -> Graph {
-        let piece = bd.piece();
-        println!("board piece={:?}", piece);
-        let wrap = bd.wrap();
-        let directed = bd.directed();
+    let piece = bd.piece();
+    println!("board piece={:?}", piece);
+    let wrap = bd.wrap();
+    let directed = bd.directed();
 
-        let mut vertices;
-        let mut new_graph: Graph; // the graph being constructed
-        // all-purpose indices
-        let mut j: Long; let mut k: usize;
+    let mut vertices;
+    let mut new_graph: Graph; // the graph being constructed
+    // all-purpose indices
+    let mut j: Long; let mut k: usize;
 
-        let mut p: u32; // |piece|
+    let mut p: u32; // |piece|
 
-        // d is the number of dimensions
-        let d = normalize_the_board_size_parameters(c, bd.dims());
+    // d is the number of dimensions
+    let d = normalize_the_board_size_parameters(c, bd.dims());
 
-        fn normalize_the_board_size_parameters<BD>(c: &mut Context, bd: BD) -> usize
-            where BD:BoardDimensions+fmt::Show
-        {
-            debug!("normalize_the_board_size_parameters bd={:?}", bd);
+    fn normalize_the_board_size_parameters<BD>(c: &mut Context, bd: BD) -> usize
+        where BD:BoardDimensions+fmt::Show
+    {
+        debug!("normalize_the_board_size_parameters bd={:?}", bd);
 
-            // [Normalize the board size parameters 11]
-            // let dbd = decode_the_board_size_paramaeters(n1, n2, n3, n4);
-            let nn = &mut c.nn; // &mut Context { ref mut nn, .. } = c;
-            let d = bd.num_dims();
-            if d > MAX_D {
-                panic!("bad_specs d: {}", d);
-            }
-            bd.fill_dims(|dim, k| {
-                debug!("normalize_the_board_size_parameters dim={} k={}",
-                         dim, k);
-                nn[k+1] = dim;
-            });
-
-            d
+        // [Normalize the board size parameters 11]
+        // let dbd = decode_the_board_size_paramaeters(n1, n2, n3, n4);
+        let nn = &mut c.nn; // &mut Context { ref mut nn, .. } = c;
+        let d = bd.num_dims();
+        if d > MAX_D {
+            panic!("bad_specs d: {}", d);
         }
+        bd.fill_dims(|dim, k| {
+            debug!("normalize_the_board_size_parameters dim={} k={}",
+                     dim, k);
+            nn[k+1] = dim;
+        });
 
-        let &mut Context {
-            ref area, ref mut nn, ref mut wr,
-            ref mut del, ref mut sig, ref mut xx, ref mut yy, .. } = c;
+        d
+    }
 
-        // [Set up a graph with n vertices 13]
+    let &mut Context {
+        ref area, ref mut nn, ref mut wr,
+        ref mut del, ref mut sig, ref mut xx, ref mut yy, .. } = c;
 
-        // We want to make the subroutine idiot-proof, so we use
-        // floating-point arithmetic to make sure that boards with
-        // more than a billion cells have not been specified.
+    // [Set up a graph with n vertices 13]
 
-        const MAX_NNN: f32 = 1_000_000_000.0;
-        let (mut n, mut nnn) = (1, 1.0);
-        for j in 1..d+1 {
-            nnn *= nn[j] as f32;
-            if nnn > MAX_NNN {
-                panic!("very_bad_specs d: {} nn: {:?}",
-                       d, nn.slice(1, d+1));
-            }
-            // this multiplication cannot cause integer overflow
-            n *= nn[j];
+    // We want to make the subroutine idiot-proof, so we use
+    // floating-point arithmetic to make sure that boards with
+    // more than a billion cells have not been specified.
+
+    const MAX_NNN: f32 = 1_000_000_000.0;
+    let (mut n, mut nnn) = (1, 1.0);
+    for j in 1..d+1 {
+        nnn *= nn[j] as f32;
+        if nnn > MAX_NNN {
+            panic!("very_bad_specs d: {} nn: {:?}",
+                   d, nn.slice(1, d+1));
         }
-        vertices = Graph::new_vertices(n);
-        let new_graph_id = bd.id();
-        let new_graph_util_types = [Z,Z,Z,I,I,I,Z,Z,Z,Z,Z,Z,Z,Z];
-        debug!("created {} vertices for graph {}", n, new_graph_id);
+        // this multiplication cannot cause integer overflow
+        n *= nn[j];
+    }
+    vertices = Graph::new_vertices(n);
+    let new_graph_id = bd.id();
+    let new_graph_util_types = [Z,Z,Z,I,I,I,Z,Z,Z,Z,Z,Z,Z,Z];
+    debug!("created {} vertices for graph {}", n, new_graph_id);
 
-        // [Give names to the vertices 14]
+    // [Give names to the vertices 14]
 
-        // @ The symbolic name of a board position like $(3,1)$ will
-        // be the string `\.{3.1}'. The first three coordinates are
-        // also stored as integers, in utility fields |x.I|, |y.I|,
-        // and |z.I|, because immediate access to those values will be
-        // helpful in certain applications. (The coordinates can, of
-        // course, always be recovered in a slower fashion from the
-        // vertex name, via |sscanf|.)
+    // @ The symbolic name of a board position like $(3,1)$ will
+    // be the string `\.{3.1}'. The first three coordinates are
+    // also stored as integers, in utility fields |x.I|, |y.I|,
+    // and |z.I|, because immediate access to those values will be
+    // helpful in certain applications. (The coordinates can, of
+    // course, always be recovered in a slower fashion from the
+    // vertex name, via |sscanf|.)
 
-        // The process of assigning coordinate values and names is
-        // equivalent to adding unity in a mixed-radix number
-        // system. Vertex $(x_1,\ldots,x_d)$ will be in position
-        // $x_1n_2\ldots n_d+\cdots+x_{d-1}n_d+x_d$ relative to the
-        // first vertex of the new graph; therefore it is also
-        // possible to deduce the coordinates of a vertex from its
-        // address.
+    // The process of assigning coordinate values and names is
+    // equivalent to adding unity in a mixed-radix number
+    // system. Vertex $(x_1,\ldots,x_d)$ will be in position
+    // $x_1n_2\ldots n_d+\cdots+x_{d-1}n_d+x_d$ relative to the
+    // first vertex of the new graph; therefore it is also
+    // possible to deduce the coordinates of a vertex from its
+    // address.
 
-        nn[0] = 0;
-        xx[0] = 0; xx[1] = 0; xx[2] = 0; xx[3] = 0;
-        for k in 4..d+1 { xx[k] = 0; }
+    nn[0] = 0;
+    xx[0] = 0; xx[1] = 0; xx[2] = 0; xx[3] = 0;
+    for k in 4..d+1 { xx[k] = 0; }
 
-        for mut v in vertices.iter_mut() {
-            let mut q = String::new();
-            for k in 1..d+1 {
-                q.push_str(format!(".{}", xx[k]).as_slice());
-            }
-            v.name = q.chars().skip(1).collect(); // omit char 0, which is '.'
-            v.util.x = Util::I(xx[1]);
-            v.util.y = Util::I(xx[2]);
-            v.util.z = Util::I(xx[3]);
-
-            debug!("named vertex {}", v);
-
-            let mut k = d;
-            while xx[k] + 1 == nn[k] {
-                xx[k] = 0;
-                k -= 1;
-            }
-            if k == 0 { break } // "carry" has occurred all the way to the left
-            xx[k] += 1; // increase coordinate k
-        }
-
-        let vertices = area.alloc(move |:| vertices);
-
-        new_graph = Graph::new_graph(&vertices[], area);
-        new_graph.id = new_graph_id;
-        new_graph.util_types = new_graph_util_types;
-
-        // [Insert arcs or edges for all legal moves 15]
-
-        // @ Now we come to a slightly tricky part of the routine: the
-        // move generator.  Let $p=|piece|$. The outer loop of this
-        // procedure runs through all solutions of the equation
-        // $\delta_1^2 + ... +\delta_d^2=p$, where the $\delta$'s are
-        // nonnegative integers.
-        //
-        // Within that loop, we attach signs to the $\delta$'s, but we
-        // always leave $\delta_k$ positive if $\delta_1=
-        // \cdots=\delta_{k-1}=0$.
-        //
-        // For every such vector~$\delta$, we generate moves from |v|
-        // to $v+\delta$ for every vertex |v|. When |directed=0|, we
-        // use |gb_new_edge| instead of |gb_new_arc|, so that the
-        // reverse arc from $v+\delta$ to~|v| is also generated.
-
-        // [Initialize the |wr|, |sig|, and |del| tables 16];
-
-        // @ The \CEE/ language does not define |>>| unambiguously. If |w| is negative,
-        // the assignment `|w>>=1|' here should keep |w| negative.
-        // (However, this technicality doesn't matter except in highly unusual cases
-        // when there are more than 32 dimensions.)
-        let mut w = wrap;
+    for mut v in vertices.iter_mut() {
+        let mut q = String::new();
         for k in 1..d+1 {
-            wr[k] = w & 1;
-            del[k] = 0; sig[k] = 0;
-
-            // (check claim above about the assignment)
-            assert!(w >= 0 || (w >> 1) < 0);
-
-            w >>= 1;
+            q.push_str(format!(".{}", xx[k]).as_slice());
         }
-        sig[0] = 0; del[0] = 0; sig[d+1] = 0;
+        v.name = q.chars().skip(1).collect(); // omit char 0, which is '.'
+        v.util.x = Util::I(xx[1]);
+        v.util.y = Util::I(xx[2]);
+        v.util.z = Util::I(xx[3]);
 
-        p = piece.moves().basic_euclidean_distance();
+        debug!("named vertex {}", v);
+
+        let mut k = d;
+        while xx[k] + 1 == nn[k] {
+            xx[k] = 0;
+            k -= 1;
+        }
+        if k == 0 { break } // "carry" has occurred all the way to the left
+        xx[k] += 1; // increase coordinate k
+    }
+
+    let vertices = area.alloc(move |:| vertices);
+
+    new_graph = Graph::new_graph(&vertices[], area);
+    new_graph.id = new_graph_id;
+    new_graph.util_types = new_graph_util_types;
+
+    // [Insert arcs or edges for all legal moves 15]
+
+    // @ Now we come to a slightly tricky part of the routine: the
+    // move generator.  Let $p=|piece|$. The outer loop of this
+    // procedure runs through all solutions of the equation
+    // $\delta_1^2 + ... +\delta_d^2=p$, where the $\delta$'s are
+    // nonnegative integers.
+    //
+    // Within that loop, we attach signs to the $\delta$'s, but we
+    // always leave $\delta_k$ positive if $\delta_1=
+    // \cdots=\delta_{k-1}=0$.
+    //
+    // For every such vector~$\delta$, we generate moves from |v|
+    // to $v+\delta$ for every vertex |v|. When |directed=0|, we
+    // use |gb_new_edge| instead of |gb_new_arc|, so that the
+    // reverse arc from $v+\delta$ to~|v| is also generated.
+
+    // [Initialize the |wr|, |sig|, and |del| tables 16];
+
+    // @ The \CEE/ language does not define |>>| unambiguously. If |w| is negative,
+    // the assignment `|w>>=1|' here should keep |w| negative.
+    // (However, this technicality doesn't matter except in highly unusual cases
+    // when there are more than 32 dimensions.)
+    let mut w = wrap;
+    for k in 1..d+1 {
+        wr[k] = w & 1;
+        del[k] = 0; sig[k] = 0;
+
+        // (check claim above about the assignment)
+        assert!(w >= 0 || (w >> 1) < 0);
+
+        w >>= 1;
+    }
+    sig[0] = 0; del[0] = 0; sig[d+1] = 0;
+
+    p = piece.moves().basic_euclidean_distance();
+    loop {
+        // [Advance to the next nonnegative |del| vector, or |break| if done 17];
+        k = d;
+        while (sig[k] + (del[k] + 1) * (del[k] + 1)) > p.to_i32().unwrap() {
+            del[k] = 0;
+            k -= 1;
+        }
+        if k == 0 { break; }
+        del[k] += 1;
+        sig[k + 1] = sig[k] + del[k] * del[k];
+        for k in k+1..d+1 { sig[k+1] = sig[k]; }
+        if sig[d+1] < p.to_i32().unwrap() { continue; }
+        debug!("  Advanced to next nonneg del vector, del={:?}",
+               &del[1us..idx(d+1)]);
         loop {
-            // [Advance to the next nonnegative |del| vector, or |break| if done 17];
-            k = d;
-            while (sig[k] + (del[k] + 1) * (del[k] + 1)) > p.to_i32().unwrap() {
-                del[k] = 0;
-                k -= 1;
-            }
-            if k == 0 { break; }
-            del[k] += 1;
-            sig[k + 1] = sig[k] + del[k] * del[k];
-            for k in k+1..d+1 { sig[k+1] = sig[k]; }
-            if sig[d+1] < p.to_i32().unwrap() { continue; }
-            debug!("  Advanced to next nonneg del vector, del={:?}",
+            debug!("    generating moves for del={:?}",
                    &del[1us..idx(d+1)]);
-            loop {
-                debug!("    generating moves for del={:?}",
-                       &del[1us..idx(d+1)]);
-                // [Generate moves for the current |del| vector 19];
-                for k in 1..d+1 { xx[k] = 0 }
-                for v in vertices.iter() {
-                    debug!("      generating moves from v={} corresponding to del={:?}",
-                           v, &del[1us..idx(d+1)]);
-                    // [Generate moves from v corresponding to del 20];
+            // [Generate moves for the current |del| vector 19];
+            for k in 1..d+1 { xx[k] = 0 }
+            for v in vertices.iter() {
+                debug!("      generating moves from v={} corresponding to del={:?}",
+                       v, &del[1us..idx(d+1)]);
+                // [Generate moves from v corresponding to del 20];
 
-                    // The legal moves when |piece| is negative are
-                    // derived as follows, in the presence of possible
-                    // wraparound: Starting at $(x_1,\ldots,x_d)$, we
-                    // move to $(x_1+\delta_1,\ldots,x_d+\delta_d)$,
-                    // $(x_1+2\delta_1,\ldots, x_d+2\delta_d)$,~\dots,
-                    // until either coming to a position with a
-                    // nonwrapped coordinate out of range or coming
-                    // back to the original point.
-                    //
-                    // A subtle technicality should be noted: When
-                    // coordinates are wrapped and |piece>0|,
-                    // self-loops are possible---for example, in
-                    // |board(1,0,0,0,1,1,1)|.  But self-loops never
-                    // arise when |piece<0|.
+                // The legal moves when |piece| is negative are
+                // derived as follows, in the presence of possible
+                // wraparound: Starting at $(x_1,\ldots,x_d)$, we
+                // move to $(x_1+\delta_1,\ldots,x_d+\delta_d)$,
+                // $(x_1+2\delta_1,\ldots, x_d+2\delta_d)$,~\dots,
+                // until either coming to a position with a
+                // nonwrapped coordinate out of range or coming
+                // back to the original point.
+                //
+                // A subtle technicality should be noted: When
+                // coordinates are wrapped and |piece>0|,
+                // self-loops are possible---for example, in
+                // |board(1,0,0,0,1,1,1)|.  But self-loops never
+                // arise when |piece<0|.
 
-                    for k in 1..d+1 { yy[k] = xx[k] + del[k] }
-                    'gen_moves_from_v: for l in (1..) {
-                        // [Correct for wraparound, or goto no_more if off the board 22]
-                        for k in 1..d+1 {
-                            if yy[k] < 0 {
-                                if wr[k] == 0 { break 'gen_moves_from_v; }
-                                loop { yy[k] += nn[k];
-                                       if yy[k] >= 0 { break; } }
-                            } else if yy[k] >= nn[k] {
-                                if wr[k] == 0 { break 'gen_moves_from_v; }
-                                loop { yy[k] -= nn[k];
-                                       if yy[k] < nn[k] { break; } }
-                            }
+                for k in 1..d+1 { yy[k] = xx[k] + del[k] }
+                'gen_moves_from_v: for l in (1..) {
+                    // [Correct for wraparound, or goto no_more if off the board 22]
+                    for k in 1..d+1 {
+                        if yy[k] < 0 {
+                            if wr[k] == 0 { break 'gen_moves_from_v; }
+                            loop { yy[k] += nn[k];
+                                   if yy[k] >= 0 { break; } }
+                        } else if yy[k] >= nn[k] {
+                            if wr[k] == 0 { break 'gen_moves_from_v; }
+                            loop { yy[k] -= nn[k];
+                                   if yy[k] < nn[k] { break; } }
                         }
-
-                        if piece.loops() {
-                            // [Go to no_more if yy == xx 21]
-                            if (1..d+1).all(|k| yy[k] == xx[k]) {
-                                break 'gen_moves_from_v;
-                            }
-                        }
-
-                        debug!("        Record a legal move from xx={:?} to yy={:?}",
-                               &xx[1us..idx(d+1)], &yy[1us..idx(d+1)]);
-                        // [Record a legal move from xx to yy 23]
-                        j = yy[1];
-                        for k in 2..d+1 { j = nn[k] * j + yy[k] }
-                        if directed {
-                            new_graph.new_arc(v, &vertices[idx(j)], l);
-                        } else {
-                            new_graph.new_edge(v, &vertices[idx(j)], l);
-                        }
-
-                        if !piece.loops() { break 'gen_moves_from_v; }
-                        for k in 1..d+1 { yy[k] += del[k]; }
                     }
-                    // 'no_more:
 
-                    k = d; while xx[k] + 1 == nn[k] {
-                        xx[k] = 0;
-                        k -= 1;
+                    if piece.loops() {
+                        // [Go to no_more if yy == xx 21]
+                        if (1..d+1).all(|k| yy[k] == xx[k]) {
+                            break 'gen_moves_from_v;
+                        }
                     }
-                    if k == 0 { break; } // "carry" has occurred all the way to left
-                    xx[k] += 1; // increase coordinate k
+
+                    debug!("        Record a legal move from xx={:?} to yy={:?}",
+                           &xx[1us..idx(d+1)], &yy[1us..idx(d+1)]);
+                    // [Record a legal move from xx to yy 23]
+                    j = yy[1];
+                    for k in 2..d+1 { j = nn[k] * j + yy[k] }
+                    if directed {
+                        new_graph.new_arc(v, &vertices[idx(j)], l);
+                    } else {
+                        new_graph.new_edge(v, &vertices[idx(j)], l);
+                    }
+
+                    if !piece.loops() { break 'gen_moves_from_v; }
+                    for k in 1..d+1 { yy[k] += del[k]; }
                 }
+                // 'no_more:
 
-                // [Advance to the next signed |del| vector, or restore |del|
-                //     to nonnegative values and |break| 18];
-                k = d;
-                while del[k] <= 0 {
-                    del[k] = -del[k];
+                k = d; while xx[k] + 1 == nn[k] {
+                    xx[k] = 0;
                     k -= 1;
                 }
-                if sig[k] == 0 { break } // all but del[k] were negative or zero
-                debug!("    Advance to next signed del vector: del={:?}",
-                       &del[1us..d+1]);
-                del[k] = -del[k]; // some entry preceding del[k] is positive
+                if k == 0 { break; } // "carry" has occurred all the way to left
+                xx[k] += 1; // increase coordinate k
             }
-        }
 
-        return new_graph;
+            // [Advance to the next signed |del| vector, or restore |del|
+            //     to nonnegative values and |break| 18];
+            k = d;
+            while del[k] <= 0 {
+                del[k] = -del[k];
+                k -= 1;
+            }
+            if sig[k] == 0 { break } // all but del[k] were negative or zero
+            debug!("    Advance to next signed del vector: del={:?}",
+                   &del[1us..d+1]);
+            del[k] = -del[k]; // some entry preceding del[k] is positive
+        }
+    }
+
+    return new_graph;
 }
 
 #[test]
