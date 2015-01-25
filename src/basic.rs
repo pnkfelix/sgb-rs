@@ -410,26 +410,6 @@ fn decode_the_board_size_parameters(
 
 impl Context {
 
-    fn normalize_the_board_size_parameters<BD:BoardDimensions+fmt::Show>(
-        &mut self, bd: BD) -> usize {
-        debug!("normalize_the_board_size_parameters bd={:?}", bd);
-
-        // [Normalize the board size parameters 11]
-        // let dbd = decode_the_board_size_paramaeters(n1, n2, n3, n4);
-        let &mut Context { ref mut nn, .. } = self;
-        let d = bd.num_dims();
-        if d > MAX_D {
-            panic!("bad_specs d: {}", d);
-        }
-        bd.fill_dims(|dim, k| {
-            debug!("normalize_the_board_size_parameters dim={} k={}",
-                     dim, k);
-            nn[k+1] = dim;
-        });
-
-        d
-    }
-
     /// [Grids and game boards. The subroutine call]
     /// `board(n1,n2,n3,n4,piece,wrap,directed)` constructs a graph
     /// based on the moves of generalized chesspieces on a generalized
@@ -534,9 +514,11 @@ impl Context {
     /// you can say `board(n,0,0,0,1,1,0)` and `board(n,0,0,0,1,1,1)`,
     /// respectively.
     fn board<BD>(&mut self, bd: BD) -> Graph where BD: BoardDescription {
-        // , n1: Long, n2: Long, n3: Long, n4: Long,
-        // piece: Long, wrap: Long, directed: Long) -> Graph where
+        board(self, bd)
+    }
+}
 
+fn board<BD:BoardDescription>(c: &mut Context, bd: BD) -> Graph {
         let piece = bd.piece();
         println!("board piece={:?}", piece);
         let wrap = bd.wrap();
@@ -550,11 +532,32 @@ impl Context {
         let mut p: u32; // |piece|
 
         // d is the number of dimensions
-        let d = self.normalize_the_board_size_parameters(bd.dims());
+        let d = normalize_the_board_size_parameters(c, bd.dims());
+
+        fn normalize_the_board_size_parameters<BD>(c: &mut Context, bd: BD) -> usize
+            where BD:BoardDimensions+fmt::Show
+        {
+            debug!("normalize_the_board_size_parameters bd={:?}", bd);
+
+            // [Normalize the board size parameters 11]
+            // let dbd = decode_the_board_size_paramaeters(n1, n2, n3, n4);
+            let nn = &mut c.nn; // &mut Context { ref mut nn, .. } = c;
+            let d = bd.num_dims();
+            if d > MAX_D {
+                panic!("bad_specs d: {}", d);
+            }
+            bd.fill_dims(|dim, k| {
+                debug!("normalize_the_board_size_parameters dim={} k={}",
+                         dim, k);
+                nn[k+1] = dim;
+            });
+
+            d
+        }
 
         let &mut Context {
             ref area, ref mut nn, ref mut wr,
-            ref mut del, ref mut sig, ref mut xx, ref mut yy, .. } = self;
+            ref mut del, ref mut sig, ref mut xx, ref mut yy, .. } = c;
 
         // [Set up a graph with n vertices 13]
 
@@ -763,7 +766,6 @@ impl Context {
         }
 
         return new_graph;
-    }
 }
 
 #[test]
