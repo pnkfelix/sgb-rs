@@ -11,8 +11,10 @@ pub mod io;
 pub mod basic;
 
 pub type Long = i32;
-fn idx<T:ToPrimitive>(t: T) -> usize { t.to_uint().unwrap() }
-fn long<T:ToPrimitive>(t: T) -> Long { t.to_i32().unwrap() }
+pub type ULong = u32;
+pub fn idx<T:ToPrimitive>(t: T) -> usize { t.to_uint().unwrap() }
+pub fn long<T:ToPrimitive>(t: T) -> Long { t.to_i32().unwrap() }
+pub fn ulong<T:ToPrimitive>(t: T) -> ULong { t.to_u32().unwrap() }
 
 
 #[test]

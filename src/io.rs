@@ -12,7 +12,7 @@ use std::num::ToPrimitive;
 /// binary form; system wizards who might need to do a bit of
 /// troubleshooting should be able to decode io errors without great
 /// pain
-#[derive(Copy, Show)]
+#[derive(Copy, Debug)]
 pub enum Error {
     /// bit set in io errors if fopen fails
     CantOpenFile         = 0x1,
@@ -43,13 +43,14 @@ pub enum Error {
 #[test]
 fn main_test() {
     // <test the gb_open routine>
-    let mut c = Context::open(Path::new("test.dat")).unwrap();
+    let mut c = Context::open(Path::new("test.dat"))
+        .unwrap_or_else(|:e| panic!("open test.dat failed, {:?}", e));
 
     // <test the sample data lines>
     test_the_sample_data_lines(&mut c);
 
     // <test the gb_close routine>
-    c.close().unwrap()
+    c.close().unwrap_or_else(|:e| panic!("close failed, {:?}", e));
 }
 
 pub struct Context {

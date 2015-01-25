@@ -1,17 +1,12 @@
 use {Long, idx, long};
-use basic::{Context, MAX_D};
+use basic::{Context, MAX_D, Repeating};
 use graph::{Graph, Util};
 use graph::UtilType::{Z,I};
 
 use std::fmt;
-use std::num::Int;
 use std::num::ToPrimitive;
 
-#[derive(Copy,Clone,Show)]
-struct Repeating<I:Int>(I);
-impl<I:Int> Repeating<I> { fn len(&self) -> I { self.0 } }
-
-#[derive(Copy,Clone,Show)]
+#[derive(Copy,Clone,Debug)]
 pub enum Moves {
     Once(u32),
     Loop(u32),
@@ -78,8 +73,8 @@ impl Piece for Moves {
 }
 
 pub trait BoardDescription {
-    type Dims: BoardDimensions + fmt::Show;
-    type Piece: Piece + fmt::Show;
+    type Dims: BoardDimensions + fmt::Debug;
+    type Piece: Piece + fmt::Debug;
     fn id(&self) -> String;
     fn piece(&self) -> Self::Piece;
     fn wrap(&self) -> Long;
@@ -88,7 +83,9 @@ pub trait BoardDescription {
 }
 
 // n1: n2: n3: n4: piece: wrap: directed
-impl<P:Piece+Clone+fmt::Show> BoardDescription for (Long, Long, Long, Long, P, Long, Long) {
+impl<P> BoardDescription for (Long, Long, Long, Long, P, Long, Long)
+    where P: Piece+Clone+fmt::Debug
+{
     type Dims = DynamicBoardDimensions;
     type Piece = P;
     fn id(&self) -> String {
@@ -106,7 +103,7 @@ impl<P:Piece+Clone+fmt::Show> BoardDescription for (Long, Long, Long, Long, P, L
 }
 
 // n1: n2: n3: n4: piece: wrap: directed
-impl<P:Piece+Clone+fmt::Show> BoardDescription for (Long, Long, Long, Long, P, Long, bool) {
+impl<P:Piece+Clone+fmt::Debug> BoardDescription for (Long, Long, Long, Long, P, Long, bool) {
     type Dims = DynamicBoardDimensions;
     type Piece = P;
     fn id(&self) -> String {
@@ -124,7 +121,7 @@ impl<P:Piece+Clone+fmt::Show> BoardDescription for (Long, Long, Long, Long, P, L
 }
 
 // dims; piece; wrap; directed
-impl<P:Piece+Clone+fmt::Show,MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, P, Long, bool) {
+impl<P:Piece+Clone+fmt::Debug,MyDims:fmt::Debug+Clone+BoardDimensions> BoardDescription for (MyDims, P, Long, bool) {
     type Dims = MyDims;
     type Piece = P;
     fn id(&self) -> String {
@@ -142,7 +139,7 @@ impl<P:Piece+Clone+fmt::Show,MyDims:fmt::Show+Clone+BoardDimensions> BoardDescri
 }
 
 // dims; piece; wrap; directed
-impl<P:Piece+Clone+fmt::Show,MyDims:fmt::Show+Clone+BoardDimensions> BoardDescription for (MyDims, P, Long, Long) {
+impl<P:Piece+Clone+fmt::Debug,MyDims:fmt::Debug+Clone+BoardDimensions> BoardDescription for (MyDims, P, Long, Long) {
     type Dims = MyDims;
     type Piece = P;
     fn id(&self) -> String {
@@ -169,14 +166,21 @@ pub trait BoardDimensions {
     fn partial_id(&self) -> String;
 }
 
-#[derive(Show)]
-enum DynamicBoardDimensions {
+#[derive(Copy,Debug)]
+pub enum DynamicBoardDimensions {
+    /// One dimensional (x,): length x
     Once1((Long,)),
+    /// Two dimensional (x,y): width x by height y
     Once2((Long,Long)),
+    /// Three dimensional (x,y,z): x by y by z, i.e. x * y * z
     Once3((Long,Long,Long)),
+    /// Four dimensional (x,y,z,w): x * y * z * w
     Once4((Long,Long,Long,Long)),
+    /// n-dimensional (Repeating(n), x): x * x * ... * x, n times
     Loop1((Repeating<usize>,Long,)),
+    /// n-dimensional (Repeating(n), x, y): x_1 * y_2 * x_3 * y_4 ... up to _n
     Loop2((Repeating<usize>,Long,Long,)),
+    /// n-dimensional (Repeating(n), x, y, z): x_1 * y_2 * z_3 * x_4 ... to _n
     Loop3((Repeating<usize>,Long,Long,Long,)),
 }
 
@@ -339,13 +343,13 @@ pub fn board<BD:BoardDescription>(c: &mut Context, bd: BD) -> Graph {
     let d = normalize_the_board_size_parameters(c, bd.dims());
 
     fn normalize_the_board_size_parameters<BD>(c: &mut Context, bd: BD) -> usize
-        where BD:BoardDimensions+fmt::Show
+        where BD:BoardDimensions+fmt::Debug
     {
         debug!("normalize_the_board_size_parameters bd={:?}", bd);
 
         // [Normalize the board size parameters 11]
         // let dbd = decode_the_board_size_paramaeters(n1, n2, n3, n4);
-        let nn = &mut c.nn; // &mut Context { ref mut nn, .. } = c;
+        let nn = &mut c.nn;
         let d = bd.num_dims();
         if d > MAX_D {
             panic!("bad_specs d: {}", d);

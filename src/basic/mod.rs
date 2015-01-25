@@ -9,6 +9,14 @@ use ::{Long};
 use ::graph::{Area, Graph};
 
 use std::default::Default;
+use std::num::Int;
+
+/// Repeating(n) is used in dimension representations to indicate that
+/// there are `n` dimensions that should be drawn from an associated
+/// repeating series; e.g. (Repeating(5),(x,y)) is [x,y,x,y,x].
+#[derive(Copy,Clone,Show)]
+pub struct Repeating<I:Int>(I);
+impl<I:Int> Repeating<I> { fn len(&self) -> I { self.0 } }
 
 /// We limit the number of dimensions to 91 or less. This is hardly a
 /// limitation, since the number of vertices would be astronomical
