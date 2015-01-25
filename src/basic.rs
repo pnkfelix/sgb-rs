@@ -513,7 +513,7 @@ impl Context {
     /// get a circuit (undirected) or a cycle (directed) of length n,
     /// you can say `board(n,0,0,0,1,1,0)` and `board(n,0,0,0,1,1,1)`,
     /// respectively.
-    fn board<BD>(&mut self, bd: BD) -> Graph where BD: BoardDescription {
+    pub fn board<BD>(&mut self, bd: BD) -> Graph where BD: BoardDescription {
         board(self, bd)
     }
 }
